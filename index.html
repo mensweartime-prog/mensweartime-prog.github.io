@@ -50,10 +50,7 @@
     font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: 0.02em;
-    background: linear-gradient(100deg, var(--accent), var(--accent-2));
-    -webkit-background-clip:text;
-    background-clip:text;
-    color:transparent;
+    color: #ffffff;
     cursor:pointer;
   }
   .tag{
@@ -96,10 +93,17 @@
     display:flex; align-items:flex-end;
     overflow:hidden;
   }
+  .card-poster img{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit: cover;
+    z-index:0;
+  }
   .card-poster::after{
     content:"";
     position:absolute; inset:0;
     background: linear-gradient(0deg, rgba(13,7,16,0.9) 0%, transparent 55%);
+    z-index:1;
   }
   .ep-number{
     position:absolute; top:14px; left:14px;
@@ -268,7 +272,8 @@
       title: "From Kindergarten Teacher to Lesbian Life",
       description: "When 26-year-old Britney, a strict and rule-obsessed kindergarten teacher, posts an ad for a roommate, she expects a quiet and orderly person. Instead, she gets Ruby — a chaotic, red-haired freelance illustrator who turns her perfectly scheduled life upside down. What starts as annoyance slowly becomes friendship, then an unexpected kiss on the balcony that changes everything. For the first time, Britney has to choose: keep living safely by her rules, or risk it all for a love she never saw coming. A slow-burn realistic story about breaking personal barriers, self-discovery, and finding courage to follow your heart.",
       youtubeId: "2bKqBidAAK0",
-      duration: "~15 min"
+      duration: "~15 min",
+      poster: "poster1.jpg"
     }
   ];
 
@@ -278,10 +283,13 @@
   function pad(n){ return n.toString().padStart(2,'0'); }
 
   function cardHTML(ep){
+    const posterImg = ep.poster ? `<img src="${ep.poster}" alt="${ep.title}">` : '';
+    const glyph = ep.poster ? '' : `<div class="glyph">${pad(ep.number)}</div>`;
     return `
       <div class="card" onclick="showEpisode(${ep.number})">
         <div class="card-poster">
-          <div class="glyph">${pad(ep.number)}</div>
+          ${posterImg}
+          ${glyph}
           <span class="ep-number">EP ${pad(ep.number)}</span>
           <div class="card-title">${ep.title}</div>
         </div>
