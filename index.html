@@ -248,7 +248,7 @@
   <div class="player" id="ep-player"></div>
   <p class="desc" id="ep-desc"></p>
 
-  <div class="up-next">
+  <div class="up-next" id="up-next">
     <h3>Watch next</h3>
     <div class="grid" id="up-next-grid"></div>
   </div>
@@ -265,24 +265,10 @@
   const EPISODES = [
     {
       number: 1,
-      title: "Olya, 24: \"I realized it in my second year of college\"",
-      description: "Olya talks about her first love, the fear of telling her family, and the moment everything clicked into place.",
-      youtubeId: "dQw4w9WgXcQ",
-      duration: "18:42"
-    },
-    {
-      number: 2,
-      title: "Marina, 31: \"It took me 10 years\"",
-      description: "A long journey to self-acceptance — marriage, divorce, and a new understanding of her own happiness.",
-      youtubeId: "dQw4w9WgXcQ",
-      duration: "24:10"
-    },
-    {
-      number: 3,
-      title: "Nastya, 19: \"My parents found out first\"",
-      description: "The youngest participant in the project — on family support and life in a small town.",
-      youtubeId: "dQw4w9WgXcQ",
-      duration: "15:05"
+      title: "From Kindergarten Teacher to Lesbian Life",
+      description: "When 26-year-old Britney, a strict and rule-obsessed kindergarten teacher, posts an ad for a roommate, she expects a quiet and orderly person. Instead, she gets Ruby — a chaotic, red-haired freelance illustrator who turns her perfectly scheduled life upside down. What starts as annoyance slowly becomes friendship, then an unexpected kiss on the balcony that changes everything. For the first time, Britney has to choose: keep living safely by her rules, or risk it all for a love she never saw coming. A slow-burn realistic story about breaking personal barriers, self-discovery, and finding courage to follow your heart.",
+      youtubeId: "2bKqBidAAK0",
+      duration: "~15 min"
     }
   ];
 
@@ -330,6 +316,7 @@
 
     const others = EPISODES.filter(e => e.number !== number).slice(0,3);
     upNextGrid.innerHTML = others.map(cardHTML).join('');
+    document.getElementById('up-next').style.display = others.length ? '' : 'none';
 
     window.scrollTo({top:0, behavior:'smooth'});
     history.replaceState(null, '', '#ep-' + number);
