@@ -1,346 +1,316 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="uk">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lesbian.</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Live Translator → UA</title>
 <style>
   :root{
-    --bg: #0d0710;
-    --bg-raised: #160c1b;
-    --line: #2a1a30;
-    --text: #f2eaf4;
-    --text-dim: #b39dbc;
-    --accent: #ff2f7e;
-    --accent-2: #6a5cff;
-    --accent-soft: rgba(255,47,126,0.12);
-    --font-display: "Playfair Display", Georgia, serif;
-    --font-body: "Inter", -apple-system, sans-serif;
-    --font-mono: "JetBrains Mono", monospace;
+    --bg:#0d0710; --raised:#160c1b; --line:#2a1a30;
+    --text:#f4eef6; --dim:#a894b0; --accent:#ff2f7e; --accent2:#6a5cff; --ok:#3ddc97;
+    --font: -apple-system, "Inter", "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
   }
-  *{ margin:0; padding:0; box-sizing:border-box; }
-  html{ scroll-behavior:smooth; }
-  body{
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-body);
-    min-height:100vh;
-  }
-  body::before{
-    content:"";
-    position:fixed; inset:0;
-    background:
-      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(255,47,126,0.16), transparent 60%),
-      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(106,92,255,0.14), transparent 60%);
-    pointer-events:none;
-    z-index:0;
-  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);display:flex;flex-direction:column;
+       padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse 800px 400px at 10% -10%,rgba(255,47,126,.14),transparent 60%),
+               radial-gradient(ellipse 600px 400px at 100% 0%,rgba(106,92,255,.12),transparent 60%)}
 
-  /* ---------- Header ---------- */
-  header{
-    position:sticky; top:0; z-index:50;
-    display:flex; align-items:center; justify-content:space-between;
-    padding: 22px 5vw;
-    background: rgba(13,7,16,0.85);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--line);
-  }
-  .logo{
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    color: #ffffff;
-    cursor:pointer;
-  }
-  .tag{
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    letter-spacing:0.15em;
-    text-transform:uppercase;
-  }
+  header{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;
+         padding:16px 5vw;border-bottom:1px solid var(--line)}
+  .title{font-weight:700;letter-spacing:.02em}
+  .title small{display:block;font-family:var(--mono);font-size:.68rem;color:var(--dim);font-weight:400;margin-top:2px}
+  .icon-btn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;
+            padding:8px 12px;font-size:.85rem;cursor:pointer;font-family:inherit}
+  .icon-btn:hover{color:var(--text);border-color:var(--accent)}
 
-  /* ---------- Catalog ---------- */
-  .catalog{
-    position:relative; z-index:1;
-    padding: 6vh 5vw 10vh;
-  }
+  #feed{position:relative;z-index:1;flex:1;overflow-y:auto;padding:24px 5vw 16px;
+        display:flex;flex-direction:column;gap:22px;max-width:900px;width:100%;margin:0 auto}
+  .empty{margin:auto;text-align:center;color:var(--dim);line-height:1.6;max-width:36ch}
+  .row .tr{font-size:clamp(1.25rem,3.2vw,1.8rem);line-height:1.4;font-weight:500}
+  .row .orig{margin-top:6px;font-size:.88rem;color:var(--dim);line-height:1.5}
+  .row .lang{display:inline-block;font-family:var(--mono);font-size:.65rem;letter-spacing:.08em;
+             text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);
+             border-radius:3px;padding:1px 6px;margin-right:8px;vertical-align:1px}
+  .row.live .tr{color:#d7c9de}
+  .row.live .orig{opacity:.8}
+  .row.live::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;
+                    background:var(--accent);margin-right:8px;animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.25}}
+  .err{color:#ff8a8a;font-size:.88rem;border:1px solid #5a2330;background:#2a0f17;padding:10px 12px;border-radius:8px}
 
-  .grid{
-    display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: 28px;
-  }
+  footer{position:relative;z-index:2;border-top:1px solid var(--line);padding:16px 5vw;
+         display:flex;align-items:center;gap:16px;justify-content:center;background:rgba(13,7,16,.9)}
+  #mic{width:68px;height:68px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:1.6rem;
+       background:linear-gradient(135deg,var(--accent),var(--accent2));transition:transform .15s}
+  #mic:hover{transform:scale(1.05)}
+  #mic.on{animation:ring 1.4s infinite}
+  @keyframes ring{0%{box-shadow:0 0 0 0 rgba(255,47,126,.55)}100%{box-shadow:0 0 0 22px rgba(255,47,126,0)}}
+  #status{font-family:var(--mono);font-size:.75rem;color:var(--dim);min-width:120px}
 
-  .card{
-    cursor:pointer;
-    border-radius: 6px;
-    overflow:hidden;
-    background: var(--bg-raised);
-    border: 1px solid var(--line);
-    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
-  }
-  .card:hover{
-    transform: translateY(-6px);
-    border-color: var(--accent);
-    box-shadow: 0 20px 40px -20px rgba(255,47,126,0.35);
-  }
-  .card-poster{
-    position:relative;
-    aspect-ratio: 2/3;
-    background: linear-gradient(155deg, #241129, #150a1c 60%);
-    display:flex; align-items:flex-end;
-    overflow:hidden;
-  }
-  .card-poster img{
-    position:absolute; inset:0;
-    width:100%; height:100%;
-    object-fit: cover;
-    z-index:0;
-  }
-  .card-poster::after{
-    content:"";
-    position:absolute; inset:0;
-    background: linear-gradient(0deg, rgba(13,7,16,0.9) 0%, transparent 55%);
-    z-index:1;
-  }
-  .ep-number{
-    position:absolute; top:14px; left:14px;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.1em;
-    color: var(--accent);
-    background: rgba(13,7,16,0.6);
-    border: 1px solid var(--accent);
-    padding: 3px 8px;
-    border-radius: 3px;
-    z-index:2;
-  }
-  .card-poster .glyph{
-    position:absolute; inset:0;
-    display:flex; align-items:center; justify-content:center;
-    font-family: var(--font-display);
-    font-size: 4.5rem;
-    font-weight:700;
-    color: rgba(255,255,255,0.06);
-  }
-  .card-title{
-    position:relative; z-index:2;
-    padding: 16px;
-    font-family: var(--font-display);
-    font-size: 1.05rem;
-    font-weight: 600;
-    line-height: 1.3;
-  }
-  .card-meta{
-    padding: 0 16px 16px;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    letter-spacing: 0.04em;
-  }
-
-  /* ---------- Episode detail ---------- */
-  .episode-view{
-    display:none;
-    position:relative; z-index:1;
-    max-width: 920px;
-    margin: 0 auto;
-    padding: 5vh 5vw 10vh;
-  }
-  .episode-view.active{ display:block; }
-  .catalog.hidden{ display:none; }
-
-  .back-link{
-    display:inline-flex; align-items:center; gap:8px;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    letter-spacing:0.1em;
-    text-transform:uppercase;
-    color: var(--text-dim);
-    text-decoration:none;
-    cursor:pointer;
-    margin-bottom: 32px;
-    transition: color .2s;
-  }
-  .back-link:hover{ color: var(--accent); }
-
-  .player{
-    position:relative;
-    width:100%;
-    aspect-ratio:16/9;
-    background:#000;
-    border-radius: 6px;
-    overflow:hidden;
-    border: 1px solid var(--line);
-    margin-bottom: 32px;
-  }
-  .player iframe{ width:100%; height:100%; border:0; }
-
-  .ep-header{
-    display:flex; align-items:center; gap:14px;
-    margin-bottom: 10px;
-  }
-  .ep-badge{
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    padding: 4px 10px;
-    border-radius: 3px;
-  }
-  .episode-view h2{
-    font-family: var(--font-display);
-    font-size: clamp(1.6rem, 4vw, 2.4rem);
-    font-weight: 700;
-    margin-bottom: 18px;
-  }
-  .episode-view .desc{
-    color: var(--text-dim);
-    line-height: 1.7;
-    font-size: 1rem;
-    max-width: 65ch;
-    margin-bottom: 40px;
-  }
-
-  .up-next{
-    border-top: 1px solid var(--line);
-    padding-top: 28px;
-  }
-  .up-next h3{
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    letter-spacing:0.15em;
-    text-transform:uppercase;
-    color: var(--text-dim);
-    margin-bottom: 18px;
-  }
-
-  footer{
-    position:relative; z-index:1;
-    text-align:center;
-    padding: 30px;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    border-top: 1px solid var(--line);
-  }
-
-  @media (max-width:600px){
-    header{ padding: 18px 5vw; }
-    .catalog{ padding: 4vh 6vw 8vh; }
-  }
+  dialog{margin:auto;background:var(--raised);color:var(--text);border:1px solid var(--line);
+         border-radius:12px;padding:24px;width:min(520px,92vw)}
+  dialog::backdrop{background:rgba(0,0,0,.7)}
+  dialog h2{font-size:1.1rem;margin-bottom:6px}
+  dialog p.note{font-size:.8rem;color:var(--dim);line-height:1.5;margin-bottom:16px}
+  label{display:block;font-size:.75rem;color:var(--dim);margin:12px 0 4px;font-family:var(--mono)}
+  input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);
+        border-radius:6px;padding:10px;font-size:.9rem;font-family:var(--mono)}
+  input:focus{outline:none;border-color:var(--accent)}
+  .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+  .btn{border:0;border-radius:8px;padding:10px 18px;font-size:.9rem;cursor:pointer;font-family:inherit}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+  .btn.ghost{background:none;border:1px solid var(--line);color:var(--dim)}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo" onclick="showCatalog()">Lesbian.</div>
+  <div class="title">Live Translator → UA<small id="detected">мову буде визначено автоматично</small></div>
+  <div style="display:flex;gap:8px">
+    <button class="icon-btn" id="clear">Очистити</button>
+    <button class="icon-btn" id="openSettings">⚙ Налаштування</button>
+  </div>
 </header>
 
-<main class="catalog" id="catalog">
-  <div class="grid" id="grid"></div>
+<main id="feed">
+  <div class="empty" id="empty">Натисни мікрофон і говори (або увімкни відео поруч). Переклад українською з'являтиметься тут у реальному часі.</div>
 </main>
 
-<section class="episode-view" id="episode-view">
-  <a class="back-link" onclick="showCatalog()">← Back to catalog</a>
-  <div class="ep-header">
-    <span class="ep-badge" id="ep-badge">EP 01</span>
+<footer>
+  <div id="status">очікування</div>
+  <button id="mic" title="Старт / стоп">🎙</button>
+  <div style="min-width:120px"></div>
+</footer>
+
+<dialog id="settings">
+  <h2>Налаштування Azure</h2>
+  <p class="note">Ключі зберігаються лише в цьому браузері (localStorage) і нікуди, крім Azure, не надсилаються. У коді сайту їх немає, тож репозиторій безпечно тримати публічним.</p>
+
+  <label>Azure Speech — ключ</label>
+  <input id="speechKey" type="password" autocomplete="off">
+  <label>Azure Speech — регіон (напр. westeurope)</label>
+  <input id="region" placeholder="westeurope">
+
+  <label>Azure OpenAI — endpoint (https://НАЗВА.openai.azure.com)</label>
+  <input id="aoaiEndpoint" placeholder="https://my-resource.openai.azure.com">
+  <label>Azure OpenAI — ключ</label>
+  <input id="aoaiKey" type="password" autocomplete="off">
+  <label>Назва deployment (GPT-4o)</label>
+  <input id="deployment" placeholder="gpt-4o">
+
+  <label>Мови для розпізнавання (через кому, до 10)</label>
+  <input id="langs" placeholder="en-US,ru-RU,pl-PL,de-DE">
+
+  <div class="actions">
+    <button class="btn ghost" id="closeSettings">Закрити</button>
+    <button class="btn primary" id="saveSettings">Зберегти</button>
   </div>
-  <h2 id="ep-title">Episode title</h2>
-  <div class="player" id="ep-player"></div>
-  <p class="desc" id="ep-desc"></p>
+</dialog>
 
-  <div class="up-next" id="up-next">
-    <h3>Watch next</h3>
-    <div class="grid" id="up-next-grid"></div>
-  </div>
-</section>
-
-<footer>Lesbian. — an independent project · 2026</footer>
-
+<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
 <script>
-  /* ===========================================================
-     ADDING A NEW EPISODE:
-     just add a new object to the EPISODES array below.
-     Get youtubeId from the video URL: youtube.com/watch?v=XXXXXXXXXXX
-     =========================================================== */
-  const EPISODES = [
-    {
-      number: 1,
-      title: "From Kindergarten Teacher to Lesbian Life",
-      description: "When 26-year-old Britney, a strict and rule-obsessed kindergarten teacher, posts an ad for a roommate, she expects a quiet and orderly person. Instead, she gets Ruby — a chaotic, red-haired freelance illustrator who turns her perfectly scheduled life upside down. What starts as annoyance slowly becomes friendship, then an unexpected kiss on the balcony that changes everything. For the first time, Britney has to choose: keep living safely by her rules, or risk it all for a love she never saw coming. A slow-burn realistic story about breaking personal barriers, self-discovery, and finding courage to follow your heart.",
-      youtubeId: "2bKqBidAAK0",
-      duration: "~15 min",
-      poster: "poster1.jpg"
+(() => {
+  const $ = id => document.getElementById(id);
+  const CFG_KEY = 'live_translator_cfg_v1';
+  const FIELDS = ['speechKey','region','aoaiEndpoint','aoaiKey','deployment','langs'];
+  const DEFAULTS = {speechKey:'',region:'',aoaiEndpoint:'',aoaiKey:'',deployment:'gpt-4o',langs:'en-US,ru-RU,pl-PL,de-DE'};
+
+  let cfg = {...DEFAULTS};
+  try { cfg = {...DEFAULTS, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}')}; } catch(e){}
+
+  const SYSTEM = `You are a real-time simultaneous interpreter. Translate the user's text into natural, fluent Ukrainian.
+Rules:
+- Convey the MEANING and intent, not word-for-word. Resolve idioms, slang, sarcasm and implied sense into idiomatic Ukrainian.
+- Use the provided previous context only to resolve pronouns, terms and tone; never translate or repeat the context.
+- Keep proper names, brands and numbers correct. Keep the speaker's register (casual/formal).
+- If the text is already Ukrainian, return it unchanged.
+- The text may be an unfinished fragment: translate what is there smoothly, without inventing the continuation.
+- Output ONLY the Ukrainian translation, no quotes, notes or explanations.`;
+
+  const feed = $('feed'), emptyEl = $('empty');
+  let recognizer = null, running = false;
+  const history = [];          // previous original sentences for context
+  let liveRow = null;
+  let interimText = '', interimBusy = false, interimPending = false, interimTimer = null, interimAt = 0, interimCtrl = null, interimSeq = 0;
+
+  const langName = code => {
+    try { return new Intl.DisplayNames(['uk'], {type:'language'}).of(code.split('-')[0]); }
+    catch(e){ return code; }
+  };
+
+  function setStatus(t){ $('status').textContent = t; }
+  function showError(msg){
+    const d = document.createElement('div'); d.className = 'err'; d.textContent = msg;
+    feed.appendChild(d); scrollDown();
+  }
+  function scrollDown(){ feed.scrollTop = feed.scrollHeight; }
+  function hideEmpty(){ if(emptyEl) emptyEl.style.display = 'none'; }
+
+  function makeRow(live){
+    hideEmpty();
+    const row = document.createElement('div');
+    row.className = 'row' + (live ? ' live' : '');
+    row.innerHTML = '<div class="tr"></div><div class="orig"><span class="lang"></span><span class="txt"></span></div>';
+    feed.appendChild(row);
+    return {
+      el: row,
+      tr: row.querySelector('.tr'),
+      lang: row.querySelector('.lang'),
+      txt: row.querySelector('.txt')
+    };
+  }
+
+  /* ---------- Azure OpenAI streaming translation ---------- */
+  async function translate(text, onUpdate, signal){
+    const base = cfg.aoaiEndpoint.replace(/\/+$/,'');
+    const url = `${base}/openai/deployments/${encodeURIComponent(cfg.deployment)}/chat/completions?api-version=2024-06-01`;
+    const ctx = history.slice(-4);
+    const user = (ctx.length ? `Previous context (do not translate):\n${ctx.join('\n')}\n\n` : '') + `Translate:\n${text}`;
+    const res = await fetch(url, {
+      method:'POST', signal,
+      headers:{'Content-Type':'application/json','api-key':cfg.aoaiKey},
+      body: JSON.stringify({
+        messages:[{role:'system',content:SYSTEM},{role:'user',content:user}],
+        temperature:0.2, max_tokens:500, stream:true
+      })
+    });
+    if(!res.ok){
+      let detail=''; try{ detail = (await res.json()).error?.message || ''; }catch(e){}
+      throw new Error(`Azure OpenAI ${res.status}: ${detail}`);
     }
-  ];
-
-  const grid = document.getElementById('grid');
-  const upNextGrid = document.getElementById('up-next-grid');
-
-  function pad(n){ return n.toString().padStart(2,'0'); }
-
-  function cardHTML(ep){
-    const posterImg = ep.poster ? `<img src="${ep.poster}" alt="${ep.title}">` : '';
-    const glyph = ep.poster ? '' : `<div class="glyph">${pad(ep.number)}</div>`;
-    return `
-      <div class="card" onclick="showEpisode(${ep.number})">
-        <div class="card-poster">
-          ${posterImg}
-          ${glyph}
-          <span class="ep-number">EP ${pad(ep.number)}</span>
-          <div class="card-title">${ep.title}</div>
-        </div>
-        <div class="card-meta">${ep.duration}</div>
-      </div>`;
-  }
-
-  function renderCatalog(){
-    grid.innerHTML = EPISODES.map(cardHTML).join('');
-  }
-
-  function showCatalog(){
-    document.getElementById('episode-view').classList.remove('active');
-    document.getElementById('catalog').classList.remove('hidden');
-    window.scrollTo({top:0, behavior:'smooth'});
-    history.replaceState(null, '', '#');
-  }
-
-  function showEpisode(number){
-    const ep = EPISODES.find(e => e.number === number);
-    if(!ep) return;
-
-    document.getElementById('catalog').classList.add('hidden');
-    const view = document.getElementById('episode-view');
-    view.classList.add('active');
-
-    document.getElementById('ep-badge').textContent = 'EP ' + pad(ep.number);
-    document.getElementById('ep-title').textContent = ep.title;
-    document.getElementById('ep-desc').textContent = ep.description;
-    document.getElementById('ep-player').innerHTML =
-      `<iframe src="https://www.youtube.com/embed/${ep.youtubeId}" title="${ep.title}" allowfullscreen></iframe>`;
-
-    const others = EPISODES.filter(e => e.number !== number).slice(0,3);
-    upNextGrid.innerHTML = others.map(cardHTML).join('');
-    document.getElementById('up-next').style.display = others.length ? '' : 'none';
-
-    window.scrollTo({top:0, behavior:'smooth'});
-    history.replaceState(null, '', '#ep-' + number);
-  }
-
-  renderCatalog();
-
-  // Deep-link support: site.html#ep-2 opens episode 2 directly (unchanged behavior)
-  window.addEventListener('load', () => {
-    const hash = location.hash;
-    if(hash.startsWith('#ep-')){
-      const n = parseInt(hash.replace('#ep-',''), 10);
-      if(!isNaN(n)) showEpisode(n);
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '', out = '';
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      buf += dec.decode(value, {stream:true});
+      const lines = buf.split('\n'); buf = lines.pop();
+      for(const line of lines){
+        const s = line.trim();
+        if(!s.startsWith('data:')) continue;
+        const data = s.slice(5).trim();
+        if(data === '[DONE]') continue;
+        try{
+          const delta = JSON.parse(data).choices?.[0]?.delta?.content;
+          if(delta){ out += delta; onUpdate(out); }
+        }catch(e){}
+      }
     }
-  });
+    return out;
+  }
+
+  /* ---------- interim (live) translation, throttled ---------- */
+  function onInterim(text, lang){
+    interimText = text;
+    if(!liveRow) liveRow = makeRow(true);
+    liveRow.txt.textContent = text;
+    if(lang){ liveRow.lang.textContent = lang.split('-')[0]; $('detected').textContent = 'розпізнано: ' + langName(lang); }
+    scrollDown();
+    scheduleInterim();
+  }
+  function scheduleInterim(){
+    if(interimBusy){ interimPending = true; return; }
+    clearTimeout(interimTimer);
+    interimTimer = setTimeout(runInterim, Math.max(0, 550 - (Date.now() - interimAt)));
+  }
+  async function runInterim(){
+    const text = interimText, seq = ++interimSeq;
+    if(!text || text.length < 6 || !liveRow) return;
+    interimBusy = true; interimAt = Date.now();
+    interimCtrl = new AbortController();
+    try{
+      await translate(text, t => { if(seq === interimSeq && liveRow) { liveRow.tr.textContent = t; scrollDown(); } }, interimCtrl.signal);
+    }catch(e){ if(e.name !== 'AbortError') showError(e.message); }
+    finally{
+      interimBusy = false;
+      if(interimPending){ interimPending = false; scheduleInterim(); }
+    }
+  }
+
+  /* ---------- final phrase: polished translation with context ---------- */
+  async function onFinal(text, lang){
+    clearTimeout(interimTimer); interimSeq++; interimPending = false;
+    if(interimCtrl) interimCtrl.abort();
+    const row = liveRow || makeRow(false);
+    liveRow = null; interimText = '';
+    row.el.classList.remove('live');
+    row.txt.textContent = text;
+    row.lang.textContent = (lang || '??').split('-')[0];
+    if(lang) $('detected').textContent = 'розпізнано: ' + langName(lang);
+
+    if(lang && lang.toLowerCase().startsWith('uk')){ row.tr.textContent = text; history.push(text); return; }
+    try{
+      const final = await translate(text, t => { row.tr.textContent = t; scrollDown(); }, undefined);
+      row.tr.textContent = final || row.tr.textContent;
+    }catch(e){ showError(e.message); }
+    history.push(text);
+    if(history.length > 20) history.shift();
+  }
+
+  /* ---------- Azure Speech with continuous language detection ---------- */
+  function start(){
+    if(!cfg.speechKey || !cfg.region || !cfg.aoaiEndpoint || !cfg.aoaiKey || !cfg.deployment){
+      $('settings').showModal(); return;
+    }
+    if(typeof SpeechSDK === 'undefined'){ showError('Не вдалось завантажити Azure Speech SDK. Перевір інтернет і онови сторінку.'); return; }
+
+    const langs = cfg.langs.split(',').map(s => s.trim()).filter(Boolean);
+    try{
+      const speechConfig = SpeechSDK.SpeechConfig.fromEndpoint(
+        new URL(`wss://${cfg.region.trim()}.stt.speech.microsoft.com/speech/universal/v2`), cfg.speechKey.trim());
+      speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_LanguageIdMode, 'Continuous');
+      const auto = SpeechSDK.AutoDetectSourceLanguageConfig.fromLanguages(langs);
+      const audio = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+      recognizer = SpeechSDK.SpeechRecognizer.FromConfig(speechConfig, auto, audio);
+    }catch(e){ showError('Помилка ініціалізації: ' + e.message); return; }
+
+    const langOf = r => { try{ return SpeechSDK.AutoDetectSourceLanguageResult.fromResult(r).language; }catch(e){ return ''; } };
+
+    recognizer.recognizing = (s, e) => { if(e.result.text) onInterim(e.result.text, langOf(e.result)); };
+    recognizer.recognized = (s, e) => {
+      if(e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text.trim())
+        onFinal(e.result.text.trim(), langOf(e.result));
+    };
+    recognizer.canceled = (s, e) => {
+      if(e.reason === SpeechSDK.CancellationReason.Error) showError('Speech: ' + e.errorDetails);
+      stop();
+    };
+
+    recognizer.startContinuousRecognitionAsync(
+      () => { running = true; $('mic').classList.add('on'); setStatus('слухаю…'); },
+      err => { showError('Не вдалось запустити: ' + err); }
+    );
+  }
+
+  function stop(){
+    if(recognizer){
+      const r = recognizer; recognizer = null;
+      r.stopContinuousRecognitionAsync(() => r.close(), () => r.close());
+    }
+    running = false; $('mic').classList.remove('on'); setStatus('очікування');
+  }
+
+  /* ---------- UI wiring ---------- */
+  $('mic').onclick = () => running ? stop() : start();
+  $('clear').onclick = () => {
+    feed.querySelectorAll('.row,.err').forEach(n => n.remove());
+    liveRow = null; history.length = 0; emptyEl.style.display = '';
+  };
+  $('openSettings').onclick = () => {
+    FIELDS.forEach(f => $(f).value = cfg[f] || '');
+    $('settings').showModal();
+  };
+  $('closeSettings').onclick = () => $('settings').close();
+  $('saveSettings').onclick = () => {
+    FIELDS.forEach(f => cfg[f] = $(f).value.trim());
+    try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(e){}
+    $('settings').close();
+  };
+})();
 </script>
-
 </body>
 </html>
