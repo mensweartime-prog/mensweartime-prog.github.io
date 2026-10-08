@@ -43,13 +43,15 @@
   .err{white-space:pre-line;color:#ff8a8a;font-size:.88rem;border:1px solid #5a2330;background:#2a0f17;padding:10px 12px;border-radius:8px}
 
   footer{position:relative;z-index:2;border-top:1px solid var(--line);padding:16px 5vw;
-         display:flex;align-items:center;gap:16px;justify-content:center;background:rgba(13,7,16,.9)}
-  #mic{width:68px;height:68px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:1.6rem;
+         display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;background:rgba(13,7,16,.9)}
+  .zl{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+  .zr{display:flex;align-items:center;justify-content:flex-start}
+  #mic{width:54px;height:54px;flex:none;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:1.3rem;
        background:linear-gradient(135deg,var(--accent),var(--accent2));transition:transform .15s}
   #mic:hover{transform:scale(1.05)}
   #mic.on{animation:ring 1.4s infinite}
   @keyframes ring{0%{box-shadow:0 0 0 0 rgba(255,47,126,.55)}100%{box-shadow:0 0 0 22px rgba(255,47,126,0)}}
-  #status{font-family:var(--mono);font-size:.75rem;color:var(--dim);min-width:120px}
+  #status{position:absolute;left:0;right:0;top:-26px;text-align:center;font-family:var(--mono);font-size:.8rem;color:var(--dim);opacity:.55;pointer-events:none}
 
   dialog{margin:auto;background:var(--raised);color:var(--text);border:1px solid var(--line);
          border-radius:12px;padding:24px;width:min(520px,92vw)}
@@ -64,9 +66,12 @@
   .btn{border:0;border-radius:8px;padding:10px 18px;font-size:.9rem;cursor:pointer;font-family:inherit}
   .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
   .btn.ghost{background:none;border:1px solid var(--line);color:var(--dim)}
-  #ptt{width:50px;height:50px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text);font-size:1.3rem;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+  #ptt{width:84px;height:84px;flex:none;font-size:2rem;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
   #ptt.on{background:linear-gradient(135deg,#ff0a78,#7b3cff);border-color:transparent;transform:scale(1.12)}
-  #tgt{background:var(--panel,#1a0f1f);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit}
+  #source{-webkit-appearance:none;appearance:none;width:30px;height:30px;padding:0;color:transparent;cursor:pointer;border:0;border-radius:8px;
+    background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M3 6l5 5 5-5' fill='none' stroke='%23c9a7c9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat}
+  #source option{color:#eee;background:#1a0f1f}
+  #tgt{width:100%;max-width:150px;background:var(--panel,#1a0f1f);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit}
 </style>
 </head>
 <body>
@@ -85,16 +90,20 @@
 
 <footer>
   <div id="status">очікування</div>
-  <button id="mic" title="Старт / стоп">🎙</button>
-  <select id="source" title="Джерело звуку" style="min-width:120px;background:var(--panel,#1a0f1f);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit"><option value="mic">🎙 Мікрофон</option><option value="system">🔊 Звук вкладки/ПК</option></select>
-  <button id="ptt" title="Затисни і говори: переклад + озвучення">🗣</button>
-  <select id="tgt" title="Мова, на яку перекладати мій голос">
+  <div class="zl">
+    <select id="source" title="Джерело звуку"><option value="mic">🎙 Мікрофон</option><option value="system">🔊 Звук вкладки/ПК</option></select>
+    <button id="mic" title="Слухати й перекладати українською">🎙</button>
+  </div>
+  <button id="ptt" title="Затисни і говори українською: переклад + озвучення">🗣</button>
+  <div class="zr">
+    <select id="tgt" title="Мова, на яку перекладати мій голос">
     <option value="en-US">→ English</option><option value="vi-VN">→ Tiếng Việt</option><option value="ar-SA">→ العربية</option>
     <option value="ru-RU">→ Русский</option><option value="pl-PL">→ Polski</option><option value="de-DE">→ Deutsch</option>
     <option value="es-ES">→ Español</option><option value="fr-FR">→ Français</option><option value="it-IT">→ Italiano</option>
     <option value="tr-TR">→ Türkçe</option><option value="zh-CN">→ 中文</option><option value="ja-JP">→ 日本語</option>
     <option value="ko-KR">→ 한국어</option><option value="cs-CZ">→ Čeština</option>
   </select>
+  </div>
 </footer>
 
 <dialog id="settings">
@@ -423,31 +432,62 @@ Rules:
     speak(buf);
   }
 
-  function pttStart(){
+  /* Мікрофон завжди готовий + пре-ролл 0.5с, щоб перші слова не губились */
+  let mic = null, preroll = [], talking = false, pushStream = null;
+  async function initMic(){
+    if(mic) return mic;
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, echoCancellation:true, noiseSuppression:true}});
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const proc = ctx.createScriptProcessor(2048, 1, 1), ratio = ctx.sampleRate / 16000;
+    proc.onaudioprocess = e => {
+      const inp = e.inputBuffer.getChannelData(0), n = Math.floor(inp.length / ratio), out = new Int16Array(n);
+      for(let i = 0; i < n; i++){
+        const a = Math.floor(i * ratio), b = Math.max(a + 1, Math.floor((i + 1) * ratio)); let sum = 0;
+        for(let j = a; j < b && j < inp.length; j++) sum += inp[j];
+        const v = Math.max(-1, Math.min(1, sum / (b - a)));
+        out[i] = v < 0 ? v * 0x8000 : v * 0x7FFF;
+      }
+      if(talking && pushStream) pushStream.write(out.buffer);
+      else { preroll.push(out.buffer); if(preroll.length > 12) preroll.shift(); }
+    };
+    ctx.createMediaStreamSource(stream).connect(proc); proc.connect(ctx.destination);
+    mic = {ctx, stream};
+    return mic;
+  }
+
+  async function pttStart(){
     if(pttBusy) return;
     if(!cfg.speechKey || !cfg.region || !cfg.aoaiEndpoint || !cfg.aoaiKey || !cfg.deployment){ $('settings').showModal(); return; }
     pttBusy = true; pttHeld = true; pttStarted = false; pttText = [];
     $('ptt').classList.add('on'); setStatus('говори…');
     try{
-      getSynth();   // розігріваємо озвучення і дозвіл на звук
+      getSynth();
+      await initMic();
+      if(mic.ctx.state === 'suspended') await mic.ctx.resume();
+      if(!pttHeld){ pttReset(); return; }          // відпустив, поки чекали дозвіл
+      pushStream = SpeechSDK.AudioInputStream.createPushStream(SpeechSDK.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1));
+      preroll.forEach(b => pushStream.write(b)); preroll = [];
+      talking = true;
       const sc = SpeechSDK.SpeechConfig.fromSubscription(cfg.speechKey, cfg.region);
       sc.speechRecognitionLanguage = MY_LANG;
-      pttRec = new SpeechSDK.SpeechRecognizer(sc, SpeechSDK.AudioConfig.fromDefaultMicrophoneInput());
+      pttRec = new SpeechSDK.SpeechRecognizer(sc, SpeechSDK.AudioConfig.fromStreamInput(pushStream));
       pttRec.recognized = (s, e) => { if(e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) pttText.push(e.result.text); };
       pttRec.canceled = (s, e) => { if(e.reason === SpeechSDK.CancellationReason.Error) showError('Speech: ' + e.errorDetails); };
-      pttRec.startContinuousRecognitionAsync(() => { pttStarted = true; if(!pttHeld) pttFinish(); },
-        err => { showError('Speech: ' + err); pttReset(); });
-    }catch(e){ showError('Помилка: ' + e.message); pttReset(); }
+      pttRec.startContinuousRecognitionAsync(() => {}, err => { showError('Speech: ' + err); pttReset(); });
+      pttStarted = true;
+    }catch(e){ showError('Мікрофон: ' + e.message); pttReset(); }
   }
-  function pttReset(){ pttBusy = false; pttHeld = false; pttStarted = false; $('ptt').classList.remove('on'); setStatus('очікування'); }
+  function pttReset(){ talking = false; pttBusy = false; pttHeld = false; pttStarted = false; $('ptt').classList.remove('on'); setStatus('очікування'); }
   function pttEnd(){ pttHeld = false; if(pttStarted) pttFinish(); }
-  function pttFinish(){
-    $('ptt').classList.remove('on'); setStatus('переклад…');
-    const r = pttRec; pttRec = null; pttStarted = false;
+  async function pttFinish(){
+    pttStarted = false; $('ptt').classList.remove('on'); setStatus('переклад…');
+    await new Promise(r => setTimeout(r, 250));     // дописуємо кінець фрази
+    talking = false; try{ pushStream.close(); }catch(e){}
+    const r = pttRec; pttRec = null;
     r.stopContinuousRecognitionAsync(async () => {
       r.close();
       const text = pttText.join(' ').trim();
-      if(!text){ pttReset(); setStatus('не почув'); return; }
+      if(!text){ pttReset(); setStatus('не почув, спробуй ще'); return; }
       const row = makeRow(false);
       row.lang.textContent = '→ ' + $('tgt').value.split('-')[0].toUpperCase();
       row.txt.textContent = text; row.tr.textContent = '…'; scrollDown();
@@ -459,6 +499,8 @@ Rules:
   pb.addEventListener('pointerdown', e => { e.preventDefault(); try{ pb.setPointerCapture(e.pointerId); }catch(_){} pttStart(); });
   ['pointerup','pointercancel'].forEach(ev => pb.addEventListener(ev, pttEnd));
   pb.addEventListener('contextmenu', e => e.preventDefault());
+
+  $('source').addEventListener('change', () => { $('mic').textContent = $('source').value === 'system' ? '🔊' : '🎙'; });
 
   /* ---------- UI wiring ---------- */
   $('mic').onclick = () => running ? stop() : start();
