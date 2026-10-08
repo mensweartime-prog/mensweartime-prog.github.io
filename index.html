@@ -40,7 +40,7 @@
   .row.live::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;
                     background:var(--accent);margin-right:8px;animation:pulse 1s infinite}
   @keyframes pulse{50%{opacity:.25}}
-  .err{color:#ff8a8a;font-size:.88rem;border:1px solid #5a2330;background:#2a0f17;padding:10px 12px;border-radius:8px}
+  .err{white-space:pre-line;color:#ff8a8a;font-size:.88rem;border:1px solid #5a2330;background:#2a0f17;padding:10px 12px;border-radius:8px}
 
   footer{position:relative;z-index:2;border-top:1px solid var(--line);padding:16px 5vw;
          display:flex;align-items:center;gap:16px;justify-content:center;background:rgba(13,7,16,.9)}
@@ -258,7 +258,16 @@ Rules:
     }
     if(typeof SpeechSDK === 'undefined'){ showError('Не вдалось завантажити Azure Speech SDK. Перевір інтернет і онови сторінку.'); return; }
 
-    const langs = cfg.langs.split(',').map(s => s.trim()).filter(Boolean);
+    const SHORT = {en:'en-US',ru:'ru-RU',pl:'pl-PL',de:'de-DE',es:'es-ES',fr:'fr-FR',it:'it-IT',pt:'pt-PT',
+                   uk:'uk-UA',tr:'tr-TR',cs:'cs-CZ',ja:'ja-JP',zh:'zh-CN',ko:'ko-KR',nl:'nl-NL',sv:'sv-SE'};
+    const norm = c => {
+      const p = c.split('-');
+      if(p.length === 1) return SHORT[p[0].toLowerCase()] || c;
+      return p[0].toLowerCase() + '-' + p[1].toUpperCase();
+    };
+    const langs = [...new Set(cfg.langs.split(/[,;\s]+/).filter(Boolean).map(norm))].slice(0, 10);
+    if(!langs.length){ showError('Вкажи хоча б одну мову в налаштуваннях, напр.: en-US,ru-RU,pl-PL,de-DE'); return; }
+    setStatus('мови: ' + langs.join(' '));
     try{
       const speechConfig = SpeechSDK.SpeechConfig.fromEndpoint(
         new URL(`wss://${cfg.region.trim()}.stt.speech.microsoft.com/speech/universal/v2`), cfg.speechKey.trim());
@@ -276,7 +285,12 @@ Rules:
         onFinal(e.result.text.trim(), langOf(e.result));
     };
     recognizer.canceled = (s, e) => {
-      if(e.reason === SpeechSDK.CancellationReason.Error) showError('Speech: ' + e.errorDetails);
+      if(e.reason === SpeechSDK.CancellationReason.Error){
+        let msg = 'Speech: ' + e.errorDetails;
+        if(String(e.errorDetails).includes('1007'))
+          msg += '\nAzure не прийняв один із кодів мов або регіон не підтримує безперервне визначення мови. Відкрий ⚙ і постав мови у форматі en-US,ru-RU,pl-PL,de-DE (по одній на мову, без зайвих символів); якщо не допоможе — спробуй регіон westeurope або eastus.';
+        showError(msg);
+      }
       stop();
     };
 
