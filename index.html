@@ -135,6 +135,7 @@ Rules:
   let recognizer = null, running = false;
   const history = [];          // previous original sentences for context
   let liveRow = null;
+  let interimOff = false;
   let interimText = '', interimBusy = false, interimPending = false, interimTimer = null, interimAt = 0, interimCtrl = null, interimSeq = 0;
 
   const langName = code => {
@@ -143,8 +144,14 @@ Rules:
   };
 
   function setStatus(t){ $('status').textContent = t; }
+  const errors = new Map();
   function showError(msg){
+    const known = errors.get(msg);
+    if(known && known.el.isConnected){
+      known.n++; known.el.textContent = msg + '  (×' + known.n + ')'; return;
+    }
     const d = document.createElement('div'); d.className = 'err'; d.textContent = msg;
+    errors.set(msg, {el: d, n: 1});
     feed.appendChild(d); scrollDown();
   }
   function scrollDown(){ feed.scrollTop = feed.scrollHeight; }
@@ -213,6 +220,7 @@ Rules:
     scheduleInterim();
   }
   function scheduleInterim(){
+    if(interimOff) return;
     if(interimBusy){ interimPending = true; return; }
     clearTimeout(interimTimer);
     interimTimer = setTimeout(runInterim, Math.max(0, 550 - (Date.now() - interimAt)));
@@ -224,7 +232,7 @@ Rules:
     interimCtrl = new AbortController();
     try{
       await translate(text, t => { if(seq === interimSeq && liveRow) { liveRow.tr.textContent = t; scrollDown(); } }, interimCtrl.signal);
-    }catch(e){ if(e.name !== 'AbortError') showError(e.message); }
+    }catch(e){ if(e.name !== 'AbortError'){ interimOff = true; showError(e.message); } }
     finally{
       interimBusy = false;
       if(interimPending){ interimPending = false; scheduleInterim(); }
@@ -246,6 +254,7 @@ Rules:
     try{
       const final = await translate(text, t => { row.tr.textContent = t; scrollDown(); }, undefined);
       row.tr.textContent = final || row.tr.textContent;
+      interimOff = false;
     }catch(e){ showError(e.message); }
     history.push(text);
     if(history.length > 20) history.shift();
