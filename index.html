@@ -64,6 +64,9 @@
   .btn{border:0;border-radius:8px;padding:10px 18px;font-size:.9rem;cursor:pointer;font-family:inherit}
   .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
   .btn.ghost{background:none;border:1px solid var(--line);color:var(--dim)}
+  #ptt{width:50px;height:50px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text);font-size:1.3rem;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+  #ptt.on{background:linear-gradient(135deg,#ff0a78,#7b3cff);border-color:transparent;transform:scale(1.12)}
+  #tgt{background:var(--panel,#1a0f1f);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit}
 </style>
 </head>
 <body>
@@ -84,6 +87,14 @@
   <div id="status">очікування</div>
   <button id="mic" title="Старт / стоп">🎙</button>
   <select id="source" title="Джерело звуку" style="min-width:120px;background:var(--panel,#1a0f1f);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit"><option value="mic">🎙 Мікрофон</option><option value="system">🔊 Звук вкладки/ПК</option></select>
+  <button id="ptt" title="Затисни і говори: переклад + озвучення">🗣</button>
+  <select id="tgt" title="Мова, на яку перекладати мій голос">
+    <option value="en-US">→ English</option><option value="vi-VN">→ Tiếng Việt</option><option value="ar-SA">→ العربية</option>
+    <option value="ru-RU">→ Русский</option><option value="pl-PL">→ Polski</option><option value="de-DE">→ Deutsch</option>
+    <option value="es-ES">→ Español</option><option value="fr-FR">→ Français</option><option value="it-IT">→ Italiano</option>
+    <option value="tr-TR">→ Türkçe</option><option value="zh-CN">→ 中文</option><option value="ja-JP">→ 日本語</option>
+    <option value="ko-KR">→ 한국어</option><option value="cs-CZ">→ Čeština</option>
+  </select>
 </footer>
 
 <dialog id="settings">
@@ -99,8 +110,8 @@
   <input id="aoaiEndpoint" placeholder="https://my-resource.openai.azure.com">
   <label>Azure OpenAI — ключ</label>
   <input id="aoaiKey" type="password" autocomplete="off">
-  <label>Назва deployment (GPT-4o)</label>
-  <input id="deployment" placeholder="gpt-4o">
+  <label>Назва deployment (GPT-4.1)</label>
+  <input id="deployment" placeholder="gpt-4.1">
 
   <label>Мови для розпізнавання (через кому, до 10)</label>
   <input id="langs" placeholder="en-US,ru-RU,pl-PL,de-DE">
@@ -117,7 +128,7 @@
   const $ = id => document.getElementById(id);
   const CFG_KEY = 'live_translator_cfg_v1';
   const FIELDS = ['speechKey','region','aoaiEndpoint','aoaiKey','deployment','langs'];
-  const DEFAULTS = {speechKey:'',region:'',aoaiEndpoint:'',aoaiKey:'',deployment:'gpt-4o',langs:'vi-VN,en-US,ar-SA'};
+  const DEFAULTS = {speechKey:'',region:'',aoaiEndpoint:'',aoaiKey:'',deployment:    'gpt-4.1',langs:'vi-VN,en-US,ar-SA'};
 
   /* ===== ВПИШИ СВОЇ ДАНІ ТУТ (мають пріоритет над налаштуваннями в браузері) ===== */
   const EMBEDDED = {
@@ -125,7 +136,7 @@
     region:        'northeurope',
     aoaiEndpoint:  'https://denis84848.openai.azure.com',
     aoaiKey:       '13UCKTKBd17TbgFOAaKL5R78WKxl3SO6Bdz5rUPbg7rW3A59caZKJQQJ99CIACYeBjFXJ3w3AAAAACOGbG9x',
-    deployment:    'gpt-4o'
+    deployment:    'gpt-4.1'
   };
 
   let cfg = {...DEFAULTS};
@@ -341,6 +352,113 @@ Rules:
     }
     running = false; $('mic').classList.remove('on'); setStatus('очікування');
   }
+
+  /* ---------- Push-to-talk: мій голос → переклад → озвучення ---------- */
+  const MY_LANG = 'uk-UA';   // якою мовою говориш ти
+  const TGT = {
+    'en-US':['English','en-US-JennyNeural'],'vi-VN':['Vietnamese','vi-VN-HoaiMyNeural'],'ar-SA':['Arabic','ar-SA-ZariyahNeural'],
+    'ru-RU':['Russian','ru-RU-SvetlanaNeural'],'pl-PL':['Polish','pl-PL-ZofiaNeural'],'de-DE':['German','de-DE-KatjaNeural'],
+    'es-ES':['Spanish','es-ES-ElviraNeural'],'fr-FR':['French','fr-FR-DeniseNeural'],'it-IT':['Italian','it-IT-ElsaNeural'],
+    'tr-TR':['Turkish','tr-TR-EmelNeural'],'zh-CN':['Chinese','zh-CN-XiaoxiaoNeural'],'ja-JP':['Japanese','ja-JP-NanamiNeural'],
+    'ko-KR':['Korean','ko-KR-SunHiNeural'],'cs-CZ':['Czech','cs-CZ-VlastaNeural']
+  };
+  try{ const t = localStorage.getItem('live_translator_tgt'); if(t && TGT[t]) $('tgt').value = t; }catch(e){}
+  $('tgt').onchange = () => { try{ localStorage.setItem('live_translator_tgt', $('tgt').value); }catch(e){} synth = null; };
+
+  let pttRec = null, pttBusy = false, pttHeld = false, pttStarted = false, pttText = [];
+  let synth = null, synthVoice = '', speakChain = Promise.resolve();
+
+  function getSynth(){
+    const voice = TGT[$('tgt').value][1];
+    if(synth && synthVoice === voice) return synth;
+    if(synth){ try{ synth.close(); }catch(e){} }
+    const sc = SpeechSDK.SpeechConfig.fromSubscription(cfg.speechKey, cfg.region);
+    sc.speechSynthesisVoiceName = voice;
+    sc.speechSynthesisOutputFormat = SpeechSDK.SpeechSynthesisOutputFormat.Raw24Khz16BitMonoPcm;
+    synth = new SpeechSDK.SpeechSynthesizer(sc, SpeechSDK.AudioConfig.fromDefaultSpeakerOutput());
+    synthVoice = voice;
+    try{ SpeechSDK.Connection.fromSynthesizer(synth).openConnection(); }catch(e){}
+    return synth;
+  }
+  function speak(text){
+    if(!text.trim()) return;
+    speakChain = speakChain.then(() => new Promise(res => {
+      getSynth().speakTextAsync(text, r => {
+        if(r.reason === SpeechSDK.ResultReason.Canceled) showError('Озвучення: ' + r.errorDetails);
+        res();
+      }, e => { showError('Озвучення: ' + e); res(); });
+    }));
+  }
+
+  async function translateAndSpeak(text, row){
+    const [lang] = TGT[$('tgt').value];
+    const url = `${cfg.aoaiEndpoint.replace(/\/+$/,'')}/openai/deployments/${encodeURIComponent(cfg.deployment)}/chat/completions?api-version=2024-06-01`;
+    const res = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'application/json','api-key':cfg.aoaiKey},
+      body: JSON.stringify({
+        messages:[{role:'system',content:`You are a speech interpreter. Translate the user's text into natural, fluent spoken ${lang}. Keep meaning, tone and names. Output ONLY the translation.`},{role:'user',content:text}],
+        temperature:0.1, max_tokens:400, stream:true
+      })
+    });
+    if(!res.ok){
+      let d=''; try{ d=(await res.json()).error?.message||''; }catch(e){}
+      throw new Error(`Azure OpenAI ${res.status}: ${d}`);
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let raw = '', full = '', buf = '';
+    for(;;){
+      const {done, value} = await reader.read();
+      if(done) break;
+      raw += dec.decode(value, {stream:true});
+      const lines = raw.split('\n'); raw = lines.pop();
+      for(const l of lines){
+        if(!l.startsWith('data:') || l.includes('[DONE]')) continue;
+        let d = ''; try{ d = JSON.parse(l.slice(5)).choices?.[0]?.delta?.content || ''; }catch(e){}
+        if(!d) continue;
+        full += d; buf += d; row.tr.textContent = full; scrollDown();
+        let m;
+        while((m = buf.match(/^([\s\S]*?[.!?…؟。！？]+)\s+([\s\S]*)$/))){ speak(m[1]); buf = m[2]; }
+      }
+    }
+    speak(buf);
+  }
+
+  function pttStart(){
+    if(pttBusy) return;
+    if(!cfg.speechKey || !cfg.region || !cfg.aoaiEndpoint || !cfg.aoaiKey || !cfg.deployment){ $('settings').showModal(); return; }
+    pttBusy = true; pttHeld = true; pttStarted = false; pttText = [];
+    $('ptt').classList.add('on'); setStatus('говори…');
+    try{
+      getSynth();   // розігріваємо озвучення і дозвіл на звук
+      const sc = SpeechSDK.SpeechConfig.fromSubscription(cfg.speechKey, cfg.region);
+      sc.speechRecognitionLanguage = MY_LANG;
+      pttRec = new SpeechSDK.SpeechRecognizer(sc, SpeechSDK.AudioConfig.fromDefaultMicrophoneInput());
+      pttRec.recognized = (s, e) => { if(e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) pttText.push(e.result.text); };
+      pttRec.canceled = (s, e) => { if(e.reason === SpeechSDK.CancellationReason.Error) showError('Speech: ' + e.errorDetails); };
+      pttRec.startContinuousRecognitionAsync(() => { pttStarted = true; if(!pttHeld) pttFinish(); },
+        err => { showError('Speech: ' + err); pttReset(); });
+    }catch(e){ showError('Помилка: ' + e.message); pttReset(); }
+  }
+  function pttReset(){ pttBusy = false; pttHeld = false; pttStarted = false; $('ptt').classList.remove('on'); setStatus('очікування'); }
+  function pttEnd(){ pttHeld = false; if(pttStarted) pttFinish(); }
+  function pttFinish(){
+    $('ptt').classList.remove('on'); setStatus('переклад…');
+    const r = pttRec; pttRec = null; pttStarted = false;
+    r.stopContinuousRecognitionAsync(async () => {
+      r.close();
+      const text = pttText.join(' ').trim();
+      if(!text){ pttReset(); setStatus('не почув'); return; }
+      const row = makeRow(false);
+      row.lang.textContent = '→ ' + $('tgt').value.split('-')[0].toUpperCase();
+      row.txt.textContent = text; row.tr.textContent = '…'; scrollDown();
+      try{ await translateAndSpeak(text, row); }catch(e){ row.tr.textContent = ''; showError(e.message); }
+      pttReset();
+    }, e => { r.close(); showError('Speech: ' + e); pttReset(); });
+  }
+  const pb = $('ptt');
+  pb.addEventListener('pointerdown', e => { e.preventDefault(); try{ pb.setPointerCapture(e.pointerId); }catch(_){} pttStart(); });
+  ['pointerup','pointercancel'].forEach(ev => pb.addEventListener(ev, pttEnd));
+  pb.addEventListener('contextmenu', e => e.preventDefault());
 
   /* ---------- UI wiring ---------- */
   $('mic').onclick = () => running ? stop() : start();
