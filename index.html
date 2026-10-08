@@ -103,7 +103,7 @@
   <input id="deployment" placeholder="gpt-4o">
 
   <label>Мови для розпізнавання (через кому, до 10)</label>
-  <input id="langs" placeholder="en-US,ru-RU,pl-PL,de-DE">
+  <input id="langs" placeholder="vi-VN,en-US,ar-SA">
 
   <div class="actions">
     <button class="btn ghost" id="closeSettings">Закрити</button>
@@ -117,7 +117,7 @@
   const $ = id => document.getElementById(id);
   const CFG_KEY = 'live_translator_cfg_v1';
   const FIELDS = ['speechKey','region','aoaiEndpoint','aoaiKey','deployment','langs'];
-  const DEFAULTS = {speechKey:'',region:'',aoaiEndpoint:'',aoaiKey:'',deployment:'gpt-4o',langs:'en-US,ru-RU,pl-PL,de-DE'};
+  const DEFAULTS = {speechKey:'',region:'',aoaiEndpoint:'',aoaiKey:'',deployment:'gpt-4o',langs:'vi-VN,en-US,ar-SA'};
 
   let cfg = {...DEFAULTS};
   try { cfg = {...DEFAULTS, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}')}; } catch(e){}
@@ -161,7 +161,7 @@ Rules:
     hideEmpty();
     const row = document.createElement('div');
     row.className = 'row' + (live ? ' live' : '');
-    row.innerHTML = '<div class="tr"></div><div class="orig"><span class="lang"></span><span class="txt"></span></div>';
+    row.innerHTML = '<div class="tr"></div><div class="orig"><span class="lang"></span><span class="txt" dir="auto"></span></div>';
     feed.appendChild(row);
     return {
       el: row,
@@ -268,14 +268,14 @@ Rules:
     if(typeof SpeechSDK === 'undefined'){ showError('Не вдалось завантажити Azure Speech SDK. Перевір інтернет і онови сторінку.'); return; }
 
     const SHORT = {en:'en-US',ru:'ru-RU',pl:'pl-PL',de:'de-DE',es:'es-ES',fr:'fr-FR',it:'it-IT',pt:'pt-PT',
-                   uk:'uk-UA',tr:'tr-TR',cs:'cs-CZ',ja:'ja-JP',zh:'zh-CN',ko:'ko-KR',nl:'nl-NL',sv:'sv-SE'};
+                   uk:'uk-UA',tr:'tr-TR',cs:'cs-CZ',ja:'ja-JP',zh:'zh-CN',ko:'ko-KR',nl:'nl-NL',sv:'sv-SE',vi:'vi-VN',ar:'ar-SA'};
     const norm = c => {
       const p = c.split('-');
       if(p.length === 1) return SHORT[p[0].toLowerCase()] || c;
       return p[0].toLowerCase() + '-' + p[1].toUpperCase();
     };
     const langs = [...new Set(cfg.langs.split(/[,;\s]+/).filter(Boolean).map(norm))].slice(0, 10);
-    if(!langs.length){ showError('Вкажи хоча б одну мову в налаштуваннях, напр.: en-US,ru-RU,pl-PL,de-DE'); return; }
+    if(!langs.length){ showError('Вкажи хоча б одну мову в налаштуваннях, напр.: vi-VN,en-US,ar-SA'); return; }
     setStatus('мови: ' + langs.join(' '));
     try{
       const speechConfig = SpeechSDK.SpeechConfig.fromEndpoint(
