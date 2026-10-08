@@ -83,7 +83,7 @@
 <footer>
   <div id="status">очікування</div>
   <button id="mic" title="Старт / стоп">🎙</button>
-  <div style="min-width:120px"></div>
+  <select id="source" title="Джерело звуку" style="min-width:120px;background:var(--panel,#1a0f1f);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit"><option value="mic">🎙 Мікрофон</option><option value="system">🔊 Звук вкладки/ПК</option></select>
 </footer>
 
 <dialog id="settings">
@@ -103,7 +103,7 @@
   <input id="deployment" placeholder="gpt-4o">
 
   <label>Мови для розпізнавання (через кому, до 10)</label>
-  <input id="langs" placeholder="vi-VN,en-US,ar-SA">
+  <input id="langs" placeholder="en-US,ru-RU,pl-PL,de-DE">
 
   <div class="actions">
     <button class="btn ghost" id="closeSettings">Закрити</button>
@@ -119,8 +119,18 @@
   const FIELDS = ['speechKey','region','aoaiEndpoint','aoaiKey','deployment','langs'];
   const DEFAULTS = {speechKey:'',region:'',aoaiEndpoint:'',aoaiKey:'',deployment:'gpt-4o',langs:'vi-VN,en-US,ar-SA'};
 
+  /* ===== ВПИШИ СВОЇ ДАНІ ТУТ (мають пріоритет над налаштуваннями в браузері) ===== */
+  const EMBEDDED = {
+    speechKey:     '7x8b1z9R8JVmMHkKEHLpAhIm8HCjznjOV2TPRkZPfnSNrjvbKeVCJQQJ99CIACi5YpzXJ3w3AAAYACOGrRfx',
+    region:        'northeurope',
+    aoaiEndpoint:  'https://denis84848.openai.azure.com',
+    aoaiKey:       '13UCKTKBd17TbgFOAaKL5R78WKxl3SO6Bdz5rUPbg7rW3A59caZKJQQJ99CIACYeBjFXJ3w3AAAAACOGbG9x',
+    deployment:    'gpt-4o'
+  };
+
   let cfg = {...DEFAULTS};
   try { cfg = {...DEFAULTS, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}')}; } catch(e){}
+  Object.keys(EMBEDDED).forEach(k => { if(EMBEDDED[k] && !/ВСТАВ/.test(EMBEDDED[k])) cfg[k] = EMBEDDED[k]; });
 
   const SYSTEM = `You are a real-time simultaneous interpreter. Translate the user's text into natural, fluent Ukrainian.
 Rules:
@@ -261,7 +271,8 @@ Rules:
   }
 
   /* ---------- Azure Speech with continuous language detection ---------- */
-  function start(){
+  let capStream = null;
+  async function start(){
     if(!cfg.speechKey || !cfg.region || !cfg.aoaiEndpoint || !cfg.aoaiKey || !cfg.deployment){
       $('settings').showModal(); return;
     }
@@ -275,14 +286,27 @@ Rules:
       return p[0].toLowerCase() + '-' + p[1].toUpperCase();
     };
     const langs = [...new Set(cfg.langs.split(/[,;\s]+/).filter(Boolean).map(norm))].slice(0, 10);
-    if(!langs.length){ showError('Вкажи хоча б одну мову в налаштуваннях, напр.: vi-VN,en-US,ar-SA'); return; }
+    if(!langs.length){ showError('Вкажи хоча б одну мову в налаштуваннях, напр.: en-US,ru-RU,pl-PL,de-DE'); return; }
     setStatus('мови: ' + langs.join(' '));
+    capStream = null;
+    if($('source').value === 'system'){
+      try{
+        const ds = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
+        if(!ds.getAudioTracks().length){
+          ds.getTracks().forEach(t => t.stop());
+          showError('Звук не передається. У вікні вибору обери вкладку Chrome і постав галочку «Поділитися звуком вкладки».'); return;
+        }
+        ds.getVideoTracks().forEach(t => t.stop());
+        capStream = new MediaStream(ds.getAudioTracks());
+        capStream.getAudioTracks()[0].onended = () => stop();
+      }catch(e){ showError('Не вдалось захопити звук: ' + e.message); return; }
+    }
     try{
       const speechConfig = SpeechSDK.SpeechConfig.fromEndpoint(
         new URL(`wss://${cfg.region.trim()}.stt.speech.microsoft.com/speech/universal/v2`), cfg.speechKey.trim());
       speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_LanguageIdMode, 'Continuous');
       const auto = SpeechSDK.AutoDetectSourceLanguageConfig.fromLanguages(langs);
-      const audio = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+      const audio = capStream ? SpeechSDK.AudioConfig.fromStreamInput(capStream) : SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
       recognizer = SpeechSDK.SpeechRecognizer.FromConfig(speechConfig, auto, audio);
     }catch(e){ showError('Помилка ініціалізації: ' + e.message); return; }
 
@@ -310,6 +334,7 @@ Rules:
   }
 
   function stop(){
+    if(capStream){ capStream.getTracks().forEach(t => t.stop()); capStream = null; }
     if(recognizer){
       const r = recognizer; recognizer = null;
       r.stopContinuousRecognitionAsync(() => r.close(), () => r.close());
