@@ -383,7 +383,7 @@ Rules:
     if(synth){ try{ synth.close(); }catch(e){} }
     const sc = SpeechSDK.SpeechConfig.fromSubscription(cfg.speechKey, cfg.region);
     sc.speechSynthesisVoiceName = voice;
-    sc.speechSynthesisOutputFormat = SpeechSDK.SpeechSynthesisOutputFormat.Raw24Khz16BitMonoPcm;
+    sc.speechSynthesisOutputFormat = SpeechSDK.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
     synth = new SpeechSDK.SpeechSynthesizer(sc, SpeechSDK.AudioConfig.fromDefaultSpeakerOutput());
     synthVoice = voice;
     try{ SpeechSDK.Connection.fromSynthesizer(synth).openConnection(); }catch(e){}
@@ -472,7 +472,10 @@ Rules:
       sc.speechRecognitionLanguage = MY_LANG;
       pttRec = new SpeechSDK.SpeechRecognizer(sc, SpeechSDK.AudioConfig.fromStreamInput(pushStream));
       pttRec.recognized = (s, e) => { if(e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) pttText.push(e.result.text); };
-      pttRec.canceled = (s, e) => { if(e.reason === SpeechSDK.CancellationReason.Error) showError('Speech: ' + e.errorDetails); };
+      pttRec.canceled = (s, e) => { if(e.reason === SpeechSDK.CancellationReason.Error){
+        let m = 'Speech: ' + e.errorDetails;
+        if(String(e.errorDetails).includes('1007')) m += '\nЛіміт Azure Speech: вимкни 🎙 (основний запис), якщо він увімкнений, і перевір тариф ресурсу (Free F0 дозволяє лише 1 одночасний запит і 5 год/міс).';
+        showError(m); } };
       pttRec.startContinuousRecognitionAsync(() => {}, err => { showError('Speech: ' + err); pttReset(); });
       pttStarted = true;
     }catch(e){ showError('Мікрофон: ' + e.message); pttReset(); }
