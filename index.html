@@ -20,108 +20,93 @@
                radial-gradient(ellipse 600px 400px at 100% 0%,rgba(106,92,255,.12),transparent 60%)}
 
   header{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;
-         padding:16px 5vw;border-bottom:1px solid var(--line)}
+         padding:14px 5vw;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
   .title{font-weight:700;letter-spacing:.02em}
   .title small{display:block;font-family:var(--mono);font-size:.68rem;color:var(--dim);font-weight:400;margin-top:2px}
   .icon-btn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;
             padding:8px 12px;font-size:.85rem;cursor:pointer;font-family:inherit}
   .icon-btn:hover{color:var(--text);border-color:var(--accent)}
 
+  #langs{position:relative;z-index:2;display:flex;gap:8px;overflow-x:auto;padding:12px 5vw;
+         border-bottom:1px solid var(--line);scrollbar-width:none}
+  #langs::-webkit-scrollbar{display:none}
+  .chip{flex:none;background:none;border:1px solid var(--line);color:var(--dim);border-radius:999px;
+        padding:7px 14px;font-size:.82rem;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .chip:hover{color:var(--text)}
+  .chip.sel{color:#fff;border-color:var(--accent);background:rgba(255,47,126,.16)}
+
   #feed{position:relative;z-index:1;flex:1;overflow-y:auto;padding:24px 5vw 16px;
         display:flex;flex-direction:column;gap:22px;max-width:900px;width:100%;margin:0 auto}
-  .empty{margin:auto;text-align:center;color:var(--dim);line-height:1.6;max-width:36ch}
+  .empty{margin:auto;text-align:center;color:var(--dim);line-height:1.6;max-width:38ch}
   .row .tr{font-size:clamp(1.25rem,3.2vw,1.8rem);line-height:1.4;font-weight:500}
   .row .orig{margin-top:6px;font-size:.88rem;color:var(--dim);line-height:1.5}
   .row .lang{display:inline-block;font-family:var(--mono);font-size:.65rem;letter-spacing:.08em;
              text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);
              border-radius:3px;padding:1px 6px;margin-right:8px;vertical-align:1px}
-  .row.live .tr{color:#d7c9de}
-  .row.live .orig{opacity:.8}
+  .row.live .orig{color:var(--text);opacity:.85}
   .row.live::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;
                     background:var(--accent);margin-right:8px;animation:pulse 1s infinite}
   @keyframes pulse{50%{opacity:.25}}
   .err{white-space:pre-line;color:#ff8a8a;font-size:.88rem;border:1px solid #5a2330;background:#2a0f17;padding:10px 12px;border-radius:8px}
 
   footer{position:relative;z-index:2;border-top:1px solid var(--line);padding:16px 5vw;
-         display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;background:rgba(13,7,16,.9)}
-  .zl{display:flex;align-items:center;justify-content:flex-end;gap:8px}
-  .zr{display:flex;align-items:center;justify-content:flex-start}
-  #mic{width:54px;height:54px;flex:none;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:1.3rem;
+         display:flex;align-items:center;gap:16px;justify-content:center;background:rgba(13,7,16,.9)}
+  #mic{width:68px;height:68px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:1.6rem;
        background:linear-gradient(135deg,var(--accent),var(--accent2));transition:transform .15s}
   #mic:hover{transform:scale(1.05)}
   #mic.on{animation:ring 1.4s infinite}
   @keyframes ring{0%{box-shadow:0 0 0 0 rgba(255,47,126,.55)}100%{box-shadow:0 0 0 22px rgba(255,47,126,0)}}
-  #status{position:absolute;left:0;right:0;top:-26px;text-align:center;font-family:var(--mono);font-size:.8rem;color:var(--dim);opacity:.55;pointer-events:none}
+  #status{font-family:var(--mono);font-size:.75rem;color:var(--dim);min-width:120px}
 
   dialog{margin:auto;background:var(--raised);color:var(--text);border:1px solid var(--line);
          border-radius:12px;padding:24px;width:min(520px,92vw)}
   dialog::backdrop{background:rgba(0,0,0,.7)}
   dialog h2{font-size:1.1rem;margin-bottom:6px}
-  dialog p.note{font-size:.8rem;color:var(--dim);line-height:1.5;margin-bottom:16px}
+  dialog p.note{font-size:.8rem;color:var(--dim);line-height:1.5;margin-bottom:12px}
   label{display:block;font-size:.75rem;color:var(--dim);margin:12px 0 4px;font-family:var(--mono)}
   input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);
         border-radius:6px;padding:10px;font-size:.9rem;font-family:var(--mono)}
   input:focus{outline:none;border-color:var(--accent)}
-  .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+  .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;flex-wrap:wrap}
   .btn{border:0;border-radius:8px;padding:10px 18px;font-size:.9rem;cursor:pointer;font-family:inherit}
   .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
   .btn.ghost{background:none;border:1px solid var(--line);color:var(--dim)}
-  #ptt{width:84px;height:84px;flex:none;font-size:2rem;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
-  #ptt.on{background:linear-gradient(135deg,#ff0a78,#7b3cff);border-color:transparent;transform:scale(1.12)}
-  #source{-webkit-appearance:none;appearance:none;width:30px;height:30px;padding:0;color:transparent;cursor:pointer;border:0;border-radius:8px;
-    background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M3 6l5 5 5-5' fill='none' stroke='%23c9a7c9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat}
-  #source option{color:#eee;background:#1a0f1f}
-  #tgt{width:100%;max-width:150px;background:var(--panel,#1a0f1f);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="title">Live Translator → UA<small id="detected">мову буде визначено автоматично</small></div>
+  <div class="title">Live Translator → UA<small id="detected">оберіть мову, якою говорять</small></div>
   <div style="display:flex;gap:8px">
     <button class="icon-btn" id="clear">Очистити</button>
     <button class="icon-btn" id="openSettings">⚙ Налаштування</button>
   </div>
 </header>
 
+<nav id="langs"></nav>
+
 <main id="feed">
-  <div class="empty" id="empty">Обери джерело звуку (мікрофон або звук вкладки), натисни кнопку зліва і слухай переклад українською. Затисни 🗣 і говори українською — переклад пролунає вголос.</div>
+  <div class="empty" id="empty">Обери мову мовця, натисни мікрофон і говори (або увімкни відео поруч). Переклад українською з'являтиметься тут одразу після кожної фрази.</div>
 </main>
 
 <footer>
   <div id="status">очікування</div>
-  <div class="zl">
-    <select id="source" title="Джерело звуку"><option value="mic">🎙 Мікрофон</option><option value="system">🔊 Звук вкладки/ПК</option></select>
-    <button id="mic" title="Слухати й перекладати українською">🎙</button>
-  </div>
-  <button id="ptt" title="Затисни і говори українською: переклад + озвучення">🗣</button>
-  <div class="zr">
-    <select id="tgt" title="Мова, на яку перекладати мій голос">
-    <option value="en-US">→ English</option><option value="vi-VN">→ Tiếng Việt</option><option value="ar-SA">→ العربية</option>
-    <option value="ru-RU">→ Русский</option><option value="pl-PL">→ Polski</option><option value="de-DE">→ Deutsch</option>
-    <option value="es-ES">→ Español</option><option value="fr-FR">→ Français</option><option value="it-IT">→ Italiano</option>
-    <option value="tr-TR">→ Türkçe</option><option value="zh-CN">→ 中文</option><option value="ja-JP">→ 日本語</option>
-    <option value="ko-KR">→ 한국어</option><option value="cs-CZ">→ Čeština</option>
-  </select>
-  </div>
+  <button id="mic" title="Старт / стоп">🎙</button>
+  <div style="min-width:120px"></div>
 </footer>
 
 <dialog id="settings">
   <h2>Налаштування</h2>
-  <p class="note">Ключ зберігається лише в цьому браузері (localStorage) і надсилається тільки до Google разом із аудіо, яке перекладається. У коді сайту його немає, тож репозиторій безпечно тримати публічним.</p>
+  <p class="note">Ключ зберігається лише в цьому браузері (localStorage) і надсилається тільки до Google. У коді сайту його немає, тож репозиторій безпечно тримати публічним. Безкоштовний ключ: aistudio.google.com → Get API key.</p>
 
-  <label>Gemini API — ключ (безкоштовний: aistudio.google.com)</label>
+  <label>Gemini API — ключ</label>
   <input id="geminiKey" type="password" autocomplete="off">
-  <label>Модель Gemini (якщо помилка 404 — впиши модель із повідомлення)</label>
-  <input id="model" list="models" placeholder="gemini-3.8-flash">
-  <datalist id="models"><option value="gemini-3.8-flash"><option value="gemini-3.5-flash-lite"></datalist>
-
-  <label>Мови, які очікуєш почути (підказка для точності, через кому)</label>
-  <input id="langs" placeholder="en-US,ru-RU,pl-PL,de-DE">
+  <label>Модель (якщо буде помилка 404 — спробуй gemini-2.5-flash)</label>
+  <input id="model" placeholder="gemini-3.1-flash-lite">
 
   <p class="note" id="testResult" style="margin:14px 0 0"></p>
   <div class="actions">
-    <button class="btn ghost" id="testSettings">Перевірити Gemini</button>
+    <button class="btn ghost" id="testSettings">Перевірити</button>
     <button class="btn ghost" id="closeSettings">Закрити</button>
     <button class="btn primary" id="saveSettings">Зберегти</button>
   </div>
@@ -130,40 +115,37 @@
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  const CFG_KEY = 'live_translator_cfg_v1';
-  const FIELDS = ['geminiKey','model','langs'];
-  const DEFAULTS = {geminiKey:'', model:'gemini-3.8-flash', langs:'vi-VN,en-US,ar-SA'};
+  const CFG_KEY = 'live_translator_gemini_cfg_v1';
+  const LANG_KEY = 'live_translator_lang_v1';
+  const FIELDS = ['geminiKey','model'];
+  const DEFAULTS = {geminiKey:'', model:'gemini-3.1-flash-lite'};
+
+  const LANGS = [
+    ['en-US','English'],['ru-RU','Русский'],['pl-PL','Polski'],['de-DE','Deutsch'],
+    ['es-ES','Español'],['fr-FR','Français'],['it-IT','Italiano'],['tr-TR','Türkçe'],
+    ['cs-CZ','Čeština'],['ja-JP','日本語'],['ko-KR','한국어'],['zh-CN','中文']
+  ];
 
   let cfg = {...DEFAULTS};
   try { cfg = {...DEFAULTS, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}')}; } catch(e){}
-  if(!cfg.model || /^gemini-(3\.1-flash-lite|2\.5-.*)$/.test(cfg.model)) cfg.model = DEFAULTS.model;   // старі моделі Google вже вимкнув
+  let lang = 'en-US';
+  try { lang = localStorage.getItem(LANG_KEY) || lang; } catch(e){}
 
-  /* ---------- prompts ---------- */
-  const enName = code => { try{ return new Intl.DisplayNames(['en'], {type:'language'}).of(code.split('-')[0]); }catch(e){ return code; } };
-  const ukName = code => { try{ return new Intl.DisplayNames(['uk'], {type:'language'}).of(code.split('-')[0]); }catch(e){ return code; } };
+  const SYSTEM = `You are a real-time simultaneous interpreter. Translate the user's text into natural, fluent Ukrainian.
+Rules:
+- Convey the MEANING and intent, not word-for-word. Resolve idioms, slang, sarcasm and implied sense into idiomatic Ukrainian.
+- Use the provided previous context only to resolve pronouns, terms and tone; never translate or repeat the context.
+- Keep proper names, brands and numbers correct. Keep the speaker's register (casual/formal).
+- If the text is already Ukrainian, return it unchanged.
+- Speech recognition may contain small mistakes; infer the most likely intended wording.
+- Output ONLY the Ukrainian translation, with no quotes, notes or explanations.`;
 
-  function listenPrompt(){
-    const hints = cfg.langs.split(/[,;\s]+/).filter(Boolean).map(enName).join(', ');
-    return `You are a world-class simultaneous interpreter and transcriber. You receive a short audio clip of live speech (from a video, a call or a conversation).
-Tasks:
-1. Identify the spoken language.${hints ? ` Most likely languages: ${hints}; others are possible.` : ''}
-2. Transcribe exactly what is said, in the original script, with correct punctuation.
-3. Translate into natural, fluent Ukrainian. Convey meaning, intent, tone, idioms, humor and register — never word-for-word. Use the previous context for consistent names, terms and pronouns.
-Notes:
-- The clip may start or end mid-sentence: translate smoothly what is present, never invent a continuation.
-- Vietnamese: listen carefully to the tones and resolve homophones by context. Pronouns and kinship terms (anh, chị, em, bạn, ông, bà, con, mình, tôi, tớ, cậu...) mark the relationship between speakers: render the matching familiarity/politeness in Ukrainian (ти/ви, forms of address). Sentence particles (ơi, nhé, nhỉ, à, ạ, đấy, mà, thôi) carry tone: express it naturally.
-- Arabic: understand regional dialects (Gulf, Levantine, Egyptian, Maghrebi, etc.); transcribe in Arabic script as spoken and translate the meaning.
-- Never add words that were not spoken. If a part is unclear, translate what is clear and use "…" for the unintelligible part.
-- If the clip contains no speech (music, noise, silence), output exactly: LANG: none
-- If the speech is already Ukrainian, copy it as the translation.
-Output EXACTLY this format and nothing else:
-LANG: <ISO 639-1 code>
-ORIGINAL: <transcript>
-UKRAINIAN: <translation>`;
-  }
-
-  /* ---------- UI helpers ---------- */
   const feed = $('feed'), emptyEl = $('empty');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null, running = false, liveRow = null;
+  const history = [];
+
+  /* ---------- helpers ---------- */
   const setStatus = t => $('status').textContent = t;
   const scrollDown = () => { feed.scrollTop = feed.scrollHeight; };
   const errors = new Map();
@@ -178,307 +160,149 @@ UKRAINIAN: <translation>`;
     emptyEl.style.display = 'none';
     const row = document.createElement('div');
     row.className = 'row' + (live ? ' live' : '');
-    row.innerHTML = '<div class="tr"></div><div class="orig"><span class="lang"></span><span class="txt" dir="auto"></span></div>';
+    row.innerHTML = '<div class="tr"></div><div class="orig"><span class="lang"></span><span class="txt"></span></div>';
     feed.appendChild(row);
-    return {el:row, tr:row.querySelector('.tr'), lang:row.querySelector('.lang'), txt:row.querySelector('.txt')};
+    row.querySelector('.lang').textContent = lang.split('-')[0];
+    return {el:row, tr:row.querySelector('.tr'), txt:row.querySelector('.txt')};
   }
 
-  /* ---------- Gemini (streaming, with retry on rate limit) ---------- */
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
-  async function geminiStream(parts, system, temperature, onDelta){
-    const model = cfg.model || DEFAULTS.model;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
-    const generationConfig = {temperature, maxOutputTokens:2048};
-    if(/^gemini-3/.test(model)) generationConfig.thinkingConfig = {thinkingLevel:'low'};   // швидше; якщо модель не підтримує — нижче повторимо без цього
-    const mkBody = () => JSON.stringify({systemInstruction:{parts:[{text:system}]}, contents:[{role:'user', parts}], generationConfig});
-    let body = mkBody();
+  /* ---------- language chips ---------- */
+  function renderChips(){
+    $('langs').innerHTML = '';
+    LANGS.forEach(([code, name]) => {
+      const b = document.createElement('button');
+      b.className = 'chip' + (code === lang ? ' sel' : '');
+      b.textContent = name;
+      b.onclick = () => {
+        lang = code;
+        try{ localStorage.setItem(LANG_KEY, lang); }catch(e){}
+        renderChips();
+        if(running){ restartRecognition(); }
+      };
+      $('langs').appendChild(b);
+    });
+  }
 
-    let res;
-    for(let attempt = 0; ; attempt++){
-      res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json','x-goog-api-key':cfg.geminiKey}, body});
-      if(res.status === 400 && generationConfig.thinkingConfig){
-        const txt = await res.clone().text().catch(() => '');
-        if(/think/i.test(txt)){ delete generationConfig.thinkingConfig; body = mkBody(); attempt--; continue; }
-      }
-      if((res.status === 429 || res.status === 503) && attempt < 3){
-        setStatus('ліміт Gemini, чекаю…'); await sleep(5000 * (attempt + 1)); continue;
-      }
-      break;
-    }
+  /* ---------- Gemini streaming translation ---------- */
+  async function translate(text, onUpdate){
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:streamGenerateContent?alt=sse`;
+    const ctx = history.slice(-4);
+    const user = (ctx.length ? `Previous context (do not translate):\n${ctx.join('\n')}\n\n` : '') + `Translate:\n${text}`;
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-goog-api-key':cfg.geminiKey},
+      body: JSON.stringify({
+        systemInstruction:{parts:[{text:SYSTEM}]},
+        contents:[{role:'user', parts:[{text:user}]}],
+        generationConfig:{temperature:0.2, maxOutputTokens:600}
+      })
+    });
     if(!res.ok){
       let detail = ''; try{ detail = (await res.json()).error?.message || ''; }catch(e){}
-      if(res.status === 429) throw new Error('Gemini 429: вичерпано ліміт запитів для цієї моделі на вашому ключі. Зачекай хвилину або вкажи в ⚙ іншу модель (напр. gemini-3.5-flash-lite); у Google AI Studio → Rate limits видно, які моделі доступні безкоштовно.');
-      if(res.status === 404) throw new Error(`Gemini 404: ${detail}\nМодель "${model}" недоступна. Відкрий ⚙ і впиши актуальну модель із цього повідомлення (зараз gemini-3.8-flash).`);
+      if(res.status === 429) throw new Error('Gemini 429: перевищено безкоштовний ліміт запитів. Зачекай хвилину і говори трохи повільніше/довшими фразами.');
       throw new Error(`Gemini ${res.status}: ${detail}`);
     }
     const reader = res.body.getReader(), dec = new TextDecoder();
-    let buf = '';
+    let buf = '', out = '';
     while(true){
       const {done, value} = await reader.read();
       if(done) break;
       buf += dec.decode(value, {stream:true});
       const lines = buf.split('\n'); buf = lines.pop();
       for(const line of lines){
-        const l = line.trim();
-        if(!l.startsWith('data:')) continue;
+        const s = line.trim();
+        if(!s.startsWith('data:')) continue;
         try{
-          const ps = JSON.parse(l.slice(5).trim()).candidates?.[0]?.content?.parts || [];
-          const t = ps.map(p => p.text || '').join('');
-          if(t) onDelta(t);
+          const parts = JSON.parse(s.slice(5).trim()).candidates?.[0]?.content?.parts || [];
+          const t = parts.map(p => p.text || '').join('');
+          if(t){ out += t; onUpdate(out); }
         }catch(e){}
       }
     }
-  }
-
-  /* ---------- audio utils ---------- */
-  function concatInt16(chunks){
-    let n = 0; chunks.forEach(c => n += c.length);
-    const out = new Int16Array(n); let o = 0;
-    chunks.forEach(c => { out.set(c, o); o += c.length; });
     return out;
   }
-  function wavBase64(int16){
-    const buf = new ArrayBuffer(44 + int16.length * 2), v = new DataView(buf);
-    const w = (o, s) => { for(let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
-    w(0,'RIFF'); v.setUint32(4, 36 + int16.length * 2, true); w(8,'WAVE'); w(12,'fmt ');
-    v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
-    v.setUint32(24,16000,true); v.setUint32(28,32000,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
-    w(36,'data'); v.setUint32(40, int16.length * 2, true);
-    new Int16Array(buf, 44).set(int16);
-    const bytes = new Uint8Array(buf); let bin = '';
-    for(let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-    return btoa(bin);
-  }
-  // MediaStream -> 16 kHz mono Int16 frames + RMS level
-  function startCapture(stream, onFrame){
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const src = ctx.createMediaStreamSource(stream);
-    const proc = ctx.createScriptProcessor(4096, 1, 1), ratio = ctx.sampleRate / 16000;
-    proc.onaudioprocess = e => {
-      const inp = e.inputBuffer.getChannelData(0), n = Math.floor(inp.length / ratio), out = new Int16Array(n);
-      let sq = 0;
-      for(let i = 0; i < n; i++){
-        const a = Math.floor(i * ratio), b = Math.max(a + 1, Math.floor((i + 1) * ratio)); let sum = 0;
-        for(let j = a; j < b && j < inp.length; j++) sum += inp[j];
-        const x = Math.max(-1, Math.min(1, sum / (b - a)));
-        sq += x * x; out[i] = x < 0 ? x * 0x8000 : x * 0x7FFF;
-      }
-      onFrame(out, Math.sqrt(sq / n));
-    };
-    src.connect(proc);
-    const mute = ctx.createGain(); mute.gain.value = 0; proc.connect(mute); mute.connect(ctx.destination);
-    if(ctx.state === 'suspended') ctx.resume();
-    return {stop(){ try{ proc.disconnect(); src.disconnect(); }catch(e){} try{ ctx.close(); }catch(e){} }};
-  }
-  // Cuts continuous audio into phrases on pauses
-  function makeSegmenter(onSegment){
-    let pre = [], seg = [], speaking = false, silenceMs = 0, speechMs = 0, totalMs = 0, floor = 0.004;
-    const reset = () => { seg = []; speaking = false; silenceMs = speechMs = totalMs = 0; };
-    const flush = () => { if(speechMs >= 300) onSegment(concatInt16(seg)); reset(); };
-    return {
-      push(pcm, rms){
-        const ms = pcm.length / 16, voiced = rms > Math.max(0.012, floor * 3);
-        if(!speaking){
-          if(voiced){ speaking = true; seg = [...pre, pcm]; pre = []; speechMs = ms; totalMs = ms * seg.length; silenceMs = 0; }
-          else { floor = floor * 0.95 + rms * 0.05; pre.push(pcm); if(pre.length > 3) pre.shift(); }
-        }else{
-          seg.push(pcm); totalMs += ms;
-          if(voiced){ speechMs += ms; silenceMs = 0; } else silenceMs += ms;
-          if(silenceMs >= 650 || totalMs >= 14000) flush();
-        }
-      },
-      flush(){ if(speaking) flush(); }
-    };
-  }
 
-  /* ---------- listening: tab/system audio or microphone -> Gemini ---------- */
-  const history = [];                 // {orig, ukr}
-  const queue = []; let working = false;
-  let running = false, capStream = null, cap = null, segmenter = null;
-
-  function parseReply(t){
-    const lang = (t.match(/LANG:\s*([^\n]*)/) || [])[1]?.trim() || '';
-    const o = t.match(/ORIGINAL:\s*([\s\S]*?)(?=\nUKRAINIAN:|$)/);
-    const u = t.match(/UKRAINIAN:\s*([\s\S]*)$/);
-    return {lang, orig: o ? o[1].trim() : '', ukr: u ? u[1].trim() : ''};
+  /* ---------- speech events ---------- */
+  function onInterim(text){
+    if(!liveRow) liveRow = makeRow(true);
+    liveRow.txt.textContent = text;
+    scrollDown();
   }
-  function updateStatus(){
-    if(!running) return;
-    setStatus('слухаю' + (queue.length || working ? ` · у черзі ${queue.length + (working ? 1 : 0)}` : ''));
-  }
-  async function processSegment(seg){
-    const row = seg.row;
-    const ctxLines = history.slice(-4).map(h => `${h.orig}  =>  ${h.ukr}`).join('\n');
-    const parts = [
-      {text: (ctxLines ? `Previous context (original => Ukrainian), do not repeat it:\n${ctxLines}\n\n` : '') + 'Interpret this audio clip.'},
-      {inlineData:{mimeType:'audio/wav', data: seg.b64}}
-    ];
-    let acc = '';
-    await geminiStream(parts, listenPrompt(), 0.1, d => {
-      acc += d;
-      const p = parseReply(acc);
-      if(/^none$/i.test(p.lang)) return;
-      if(p.lang){ row.lang.textContent = p.lang.toLowerCase().slice(0, 3); $('detected').textContent = 'розпізнано: ' + ukName(p.lang); }
-      if(p.orig) row.txt.textContent = p.orig;
-      if(p.ukr){ row.tr.textContent = p.ukr; }
-      scrollDown();
-    });
-    const p = parseReply(acc);
-    if(/^none$/i.test(p.lang) || (!p.orig && !p.ukr)){ row.el.remove(); return; }
+  async function onFinal(text){
+    const row = liveRow || makeRow(false);
+    liveRow = null;
     row.el.classList.remove('live');
-    history.push({orig: p.orig, ukr: p.ukr || p.orig});
+    row.txt.textContent = text;
+    if(lang.startsWith('uk')){ row.tr.textContent = text; return; }
+    row.tr.textContent = '…';
+    try{
+      const final = await translate(text, t => { row.tr.textContent = t; scrollDown(); });
+      row.tr.textContent = final || '';
+    }catch(e){ row.tr.textContent = ''; showError(e.message); }
+    history.push(text);
     if(history.length > 20) history.shift();
   }
-  async function pump(){
-    if(working) return;
-    working = true;
-    while(queue.length){
-      updateStatus();
-      const seg = queue.shift();
-      try{ await processSegment(seg); }
-      catch(e){ seg.row.el.remove(); showError(e.message); }
-    }
-    working = false; updateStatus(); if(!running) setStatus('очікування');
-  }
-  function onSegment(int16){
-    const row = makeRow(true);
-    row.tr.textContent = '…'; row.txt.textContent = 'розпізнаю…'; scrollDown();
-    queue.push({b64: wavBase64(int16), row});
-    updateStatus(); pump();
+
+  function buildRecognition(){
+    const r = new SR();
+    r.lang = lang;
+    r.continuous = true;
+    r.interimResults = true;
+    r.maxAlternatives = 1;
+    r.onresult = e => {
+      let interim = '';
+      for(let i = e.resultIndex; i < e.results.length; i++){
+        const res = e.results[i], t = res[0].transcript.trim();
+        if(res.isFinal){ if(t) onFinal(t); interim = ''; }
+        else interim += (interim ? ' ' : '') + t;
+      }
+      if(interim) onInterim(interim);
+    };
+    r.onerror = e => {
+      if(e.error === 'no-speech' || e.error === 'aborted') return;
+      if(e.error === 'not-allowed' || e.error === 'service-not-allowed'){
+        showError('Немає доступу до мікрофона. Дозволь його в налаштуваннях браузера для цього сайту.');
+        stop(); return;
+      }
+      showError('Розпізнавання: ' + e.error);
+    };
+    r.onend = () => {                       // Chrome сам зупиняє сеанс — перезапускаємо
+      if(running && recognition === r){ try{ r.start(); }catch(e){} }
+    };
+    return r;
   }
 
-  async function start(){
+  function start(){
+    if(!SR){ showError('Цей браузер не підтримує розпізнавання мовлення. Відкрий сайт у Google Chrome або Edge.'); return; }
     if(!cfg.geminiKey){ $('settings').showModal(); return; }
-    capStream = null;
-    try{
-      if($('source').value === 'system'){
-        const ds = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
-        if(!ds.getAudioTracks().length){
-          ds.getTracks().forEach(t => t.stop());
-          showError('Звук не передається. У вікні вибору обери вкладку Chrome і постав галочку «Поділитися звуком вкладки».'); return;
-        }
-        ds.getVideoTracks().forEach(t => t.stop());
-        capStream = new MediaStream(ds.getAudioTracks());
-        capStream.getAudioTracks()[0].onended = () => stop();
-      }else{
-        capStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, echoCancellation:false, noiseSuppression:false, autoGainControl:true}});
-      }
-    }catch(e){ showError('Не вдалось отримати звук: ' + e.message); return; }
-    segmenter = makeSegmenter(onSegment);
-    cap = startCapture(capStream, (pcm, rms) => {
-      if('speechSynthesis' in window && speechSynthesis.speaking) return;   // не слухаємо власне озвучення
-      segmenter.push(pcm, rms);
-    });
-    running = true; $('mic').classList.add('on'); updateStatus(); setStatus('слухаю');
+    recognition = buildRecognition();
+    running = true;
+    try{ recognition.start(); }catch(e){ showError(e.message); running = false; return; }
+    $('mic').classList.add('on'); setStatus('слухаю: ' + lang);
+    $('detected').textContent = 'мова мовця: ' + (LANGS.find(l => l[0] === lang)?.[1] || lang);
+  }
+  function restartRecognition(){
+    const old = recognition; recognition = null;
+    try{ old && old.abort(); }catch(e){}
+    liveRow = null;
+    recognition = buildRecognition();
+    recognition.lang = lang;
+    try{ recognition.start(); }catch(e){}
+    setStatus('слухаю: ' + lang);
+    $('detected').textContent = 'мова мовця: ' + (LANGS.find(l => l[0] === lang)?.[1] || lang);
   }
   function stop(){
-    if(segmenter){ segmenter.flush(); segmenter = null; }
-    if(cap){ cap.stop(); cap = null; }
-    if(capStream){ capStream.getTracks().forEach(t => t.stop()); capStream = null; }
-    running = false; $('mic').classList.remove('on'); setStatus(queue.length ? 'доперекладаю…' : 'очікування');
+    running = false;
+    const r = recognition; recognition = null;
+    try{ r && r.stop(); }catch(e){}
+    $('mic').classList.remove('on'); setStatus('очікування');
   }
-
-  /* ---------- push-to-talk: my voice -> Gemini -> spoken translation ---------- */
-  const TGT = {
-    'en-US':'English','vi-VN':'Vietnamese','ar-SA':'Arabic','ru-RU':'Russian','pl-PL':'Polish','de-DE':'German',
-    'es-ES':'Spanish','fr-FR':'French','it-IT':'Italian','tr-TR':'Turkish','zh-CN':'Chinese','ja-JP':'Japanese',
-    'ko-KR':'Korean','cs-CZ':'Czech'
-  };
-  try{ const t = localStorage.getItem('live_translator_tgt'); if(t && TGT[t]) $('tgt').value = t; }catch(e){}
-  $('tgt').onchange = () => { try{ localStorage.setItem('live_translator_tgt', $('tgt').value); }catch(e){} };
-
-  let voices = [], warnedVoice = false;
-  const loadVoices = () => { if('speechSynthesis' in window) voices = speechSynthesis.getVoices(); };
-  loadVoices();
-  if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = loadVoices;
-  function pickVoice(code){
-    const full = code.toLowerCase(), short = full.split('-')[0];
-    const match = voices.filter(v => v.lang.replace('_','-').toLowerCase() === full)
-      .concat(voices.filter(v => v.lang.toLowerCase().startsWith(short)));
-    return match.find(v => /premium|enhanced|natural|neural/i.test(v.name)) || match[0] || null;
-  }
-  function speak(text){
-    if(!text.trim() || !('speechSynthesis' in window)) return;
-    const code = $('tgt').value, u = new SpeechSynthesisUtterance(text);
-    u.lang = code;
-    const v = pickVoice(code);
-    if(v) u.voice = v;
-    else if(!warnedVoice){
-      warnedVoice = true;
-      showError('У системі немає голосу для цієї мови, тому озвучення може звучати неправильно. На Mac: Системні налаштування → Універсальний доступ → Мовлення → Системний голос → Керувати голосами.');
-    }
-    speechSynthesis.speak(u);
-  }
-
-  let pttMic = null, pttPre = [], pttBuf = [], talking = false, pttHeld = false, pttBusy = false;
-  async function initPttMic(){
-    if(pttMic) return;
-    const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, echoCancellation:true, noiseSuppression:true}});
-    const c = startCapture(stream, pcm => {
-      if(talking) pttBuf.push(pcm); else { pttPre.push(pcm); if(pttPre.length > 3) pttPre.shift(); }
-    });
-    pttMic = {stream, c};
-  }
-  async function pttStart(){
-    if(pttBusy) return;
-    if(!cfg.geminiKey){ $('settings').showModal(); return; }
-    pttBusy = true; pttHeld = true;
-    $('ptt').classList.add('on'); setStatus('говори…');
-    try{
-      await initPttMic();
-      if(!pttHeld){ pttReset(); return; }
-      pttBuf = [...pttPre]; pttPre = []; talking = true;
-    }catch(e){ showError('Мікрофон: ' + e.message); pttReset(); }
-  }
-  function pttReset(){ talking = false; pttBusy = false; pttHeld = false; $('ptt').classList.remove('on'); setStatus(running ? 'слухаю' : 'очікування'); }
-  async function pttEnd(){
-    pttHeld = false;
-    if(!talking){ return; }
-    $('ptt').classList.remove('on'); setStatus('переклад…');
-    await sleep(250);
-    talking = false;
-    const pcm = concatInt16(pttBuf); pttBuf = [];
-    if(pcm.length < 16000 * 0.3){ pttReset(); setStatus('надто коротко, спробуй ще'); return; }
-    const target = TGT[$('tgt').value];
-    const row = makeRow(false);
-    row.lang.textContent = '→ ' + $('tgt').value.split('-')[0].toUpperCase();
-    row.txt.textContent = '…'; row.tr.textContent = '…'; scrollDown();
-    const system = `You are a speech interpreter. The audio is the user's speech (usually Ukrainian). Transcribe it exactly, then translate it into natural, fluent spoken ${target}, keeping meaning, tone, register and names.
-Output EXACTLY this format and nothing else:
-ORIGINAL: <transcript>
-TRANSLATION: <translation>`;
-    const parts = [{text:'Interpret this audio.'}, {inlineData:{mimeType:'audio/wav', data: wavBase64(pcm)}}];
-    let acc = '', spoken = 0;
-    try{
-      await geminiStream(parts, system, 0.1, d => {
-        acc += d;
-        const o = acc.match(/ORIGINAL:\s*([\s\S]*?)(?=\nTRANSLATION:|$)/);
-        const t = acc.match(/TRANSLATION:\s*([\s\S]*)$/);
-        if(o) row.txt.textContent = o[1].trim();
-        if(t){
-          const tr = t[1];
-          row.tr.textContent = tr.trim(); scrollDown();
-          let m;
-          while((m = tr.slice(spoken).match(/^([\s\S]*?[.!?…؟。！？]+)\s+/))){ speak(m[1]); spoken += m[0].length; }
-        }
-      });
-      const t = acc.match(/TRANSLATION:\s*([\s\S]*)$/);
-      if(t) speak(t[1].slice(spoken));
-      else row.tr.textContent = '';
-    }catch(e){ row.tr.textContent = ''; showError(e.message); }
-    pttReset();
-  }
-  const pb = $('ptt');
-  pb.addEventListener('pointerdown', e => { e.preventDefault(); try{ pb.setPointerCapture(e.pointerId); }catch(_){} pttStart(); });
-  ['pointerup','pointercancel'].forEach(ev => pb.addEventListener(ev, pttEnd));
-  pb.addEventListener('contextmenu', e => e.preventDefault());
 
   /* ---------- UI wiring ---------- */
-  $('source').addEventListener('change', () => { $('mic').textContent = $('source').value === 'system' ? '🔊' : '🎙'; });
   $('mic').onclick = () => running ? stop() : start();
   $('clear').onclick = () => {
     feed.querySelectorAll('.row,.err').forEach(n => n.remove());
-    errors.clear(); history.length = 0; queue.length = 0; emptyEl.style.display = '';
+    errors.clear(); liveRow = null; history.length = 0; emptyEl.style.display = '';
   };
   $('openSettings').onclick = () => { FIELDS.forEach(f => $(f).value = cfg[f] || ''); $('settings').showModal(); };
   $('closeSettings').onclick = () => $('settings').close();
@@ -489,19 +313,21 @@ TRANSLATION: <translation>`;
     $('settings').close();
   };
   $('testSettings').onclick = async () => {
-    const out = $('testResult'), saved = {...cfg};
+    const out = $('testResult');
+    const saved = {...cfg};
     FIELDS.forEach(f => cfg[f] = $(f).value.trim());
     if(!cfg.model) cfg.model = DEFAULTS.model;
     out.style.color = ''; out.textContent = 'Перевіряю…';
-    let r = '';
     try{
-      await geminiStream([{text:'Chào bạn, hôm nay bạn khỏe không?'}], 'Translate the user text into natural Ukrainian. Output only the translation.', 0.1, d => { r += d; });
-      out.style.color = 'var(--ok)'; out.textContent = 'Працює (' + cfg.model + '): ' + r;
+      const r = await translate('Good morning, how are you today?', () => {});
+      out.style.color = 'var(--ok)'; out.textContent = 'Працює: ' + r;
     }catch(e){ out.style.color = '#ff8a8a'; out.textContent = e.message; }
     cfg = saved;
   };
+
+  renderChips();
+  if(!SR) showError('Цей браузер не підтримує розпізнавання мовлення. Відкрий сайт у Google Chrome або Edge.');
 })();
 </script>
-
 </body>
 </html>
