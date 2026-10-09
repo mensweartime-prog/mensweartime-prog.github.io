@@ -85,7 +85,7 @@
 </header>
 
 <main id="feed">
-  <div class="empty" id="empty">Натисни мікрофон і говори (або увімкни відео поруч). Переклад українською з'являтиметься тут у реальному часі.</div>
+  <div class="empty" id="empty">Обери джерело звуку (мікрофон або звук вкладки), натисни кнопку зліва і слухай переклад українською. Затисни 🗣 і говори українською — переклад пролунає вголос.</div>
 </main>
 
 <footer>
@@ -108,19 +108,15 @@
 
 <dialog id="settings">
   <h2>Налаштування</h2>
-  <p class="note">Ключі зберігаються лише в цьому браузері (localStorage) і надсилаються лише до Azure (мовлення) та Google (переклад). У коді сайту їх немає, тож репозиторій безпечно тримати публічним.</p>
-
-  <label>Azure Speech — ключ</label>
-  <input id="speechKey" type="password" autocomplete="off">
-  <label>Azure Speech — регіон (напр. westeurope)</label>
-  <input id="region" placeholder="westeurope">
+  <p class="note">Ключ зберігається лише в цьому браузері (localStorage) і надсилається тільки до Google разом із аудіо, яке перекладається. У коді сайту його немає, тож репозиторій безпечно тримати публічним.</p>
 
   <label>Gemini API — ключ (безкоштовний: aistudio.google.com)</label>
   <input id="geminiKey" type="password" autocomplete="off">
-  <label>Модель Gemini (якщо помилка 404 — спробуй gemini-2.5-flash)</label>
-  <input id="model" placeholder="gemini-3.1-flash-lite">
+  <label>Модель Gemini (для найкращої якості спробуй gemini-2.5-pro; швидше — gemini-2.5-flash)</label>
+  <input id="model" list="models" placeholder="gemini-2.5-flash">
+  <datalist id="models"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"><option value="gemini-2.5-flash-lite"></datalist>
 
-  <label>Мови для розпізнавання (через кому, до 10)</label>
+  <label>Мови, які очікуєш почути (підказка для точності, через кому)</label>
   <input id="langs" placeholder="en-US,ru-RU,pl-PL,de-DE">
 
   <p class="note" id="testResult" style="margin:14px 0 0"></p>
@@ -131,82 +127,82 @@
   </div>
 </dialog>
 
-<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
   const CFG_KEY = 'live_translator_cfg_v1';
-  const FIELDS = ['speechKey','region','geminiKey','model','langs'];
-  const DEFAULTS = {speechKey:'',region:'northeurope',geminiKey:'',model:'gemini-3.1-flash-lite',langs:'vi-VN,en-US,ar-SA'};
-
+  const FIELDS = ['geminiKey','model','langs'];
+  const DEFAULTS = {geminiKey:'', model:'gemini-2.5-flash', langs:'vi-VN,en-US,ar-SA'};
 
   let cfg = {...DEFAULTS};
   try { cfg = {...DEFAULTS, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}')}; } catch(e){}
+  if(!cfg.model || cfg.model === 'gemini-3.1-flash-lite') cfg.model = DEFAULTS.model;
 
-  const SYSTEM = `You are a real-time simultaneous interpreter. Translate the user's text into natural, fluent Ukrainian.
-Rules:
-- Convey the MEANING and intent, not word-for-word. Resolve idioms, slang, sarcasm and implied sense into idiomatic Ukrainian.
-- Use the provided previous context only to resolve pronouns, terms and tone; never translate or repeat the context.
-- Keep proper names, brands and numbers correct. Keep the speaker's register (casual/formal).
-- If the text is already Ukrainian, return it unchanged.
-- The text may be an unfinished fragment: translate what is there smoothly, without inventing the continuation.
-- Output ONLY the Ukrainian translation, no quotes, notes or explanations.`;
+  /* ---------- prompts ---------- */
+  const enName = code => { try{ return new Intl.DisplayNames(['en'], {type:'language'}).of(code.split('-')[0]); }catch(e){ return code; } };
+  const ukName = code => { try{ return new Intl.DisplayNames(['uk'], {type:'language'}).of(code.split('-')[0]); }catch(e){ return code; } };
 
+  function listenPrompt(){
+    const hints = cfg.langs.split(/[,;\s]+/).filter(Boolean).map(enName).join(', ');
+    return `You are a world-class simultaneous interpreter and transcriber. You receive a short audio clip of live speech (from a video, a call or a conversation).
+Tasks:
+1. Identify the spoken language.${hints ? ` Most likely languages: ${hints}; others are possible.` : ''}
+2. Transcribe exactly what is said, in the original script, with correct punctuation.
+3. Translate into natural, fluent Ukrainian. Convey meaning, intent, tone, idioms, humor and register — never word-for-word. Use the previous context for consistent names, terms and pronouns.
+Notes:
+- The clip may start or end mid-sentence: translate smoothly what is present, never invent a continuation.
+- Vietnamese: listen carefully to the tones and resolve homophones by context. Pronouns and kinship terms (anh, chị, em, bạn, ông, bà, con, mình, tôi, tớ, cậu...) mark the relationship between speakers: render the matching familiarity/politeness in Ukrainian (ти/ви, forms of address). Sentence particles (ơi, nhé, nhỉ, à, ạ, đấy, mà, thôi) carry tone: express it naturally.
+- Arabic: understand regional dialects (Gulf, Levantine, Egyptian, Maghrebi, etc.); transcribe in Arabic script as spoken and translate the meaning.
+- Never add words that were not spoken. If a part is unclear, translate what is clear and use "…" for the unintelligible part.
+- If the clip contains no speech (music, noise, silence), output exactly: LANG: none
+- If the speech is already Ukrainian, copy it as the translation.
+Output EXACTLY this format and nothing else:
+LANG: <ISO 639-1 code>
+ORIGINAL: <transcript>
+UKRAINIAN: <translation>`;
+  }
+
+  /* ---------- UI helpers ---------- */
   const feed = $('feed'), emptyEl = $('empty');
-  let recognizer = null, running = false;
-  const history = [];          // previous original sentences for context
-  let liveRow = null;
-  let interimOff = false;
-  let interimText = '', interimBusy = false, interimPending = false, interimTimer = null, interimAt = 0, interimCtrl = null, interimSeq = 0;
-
-  const langName = code => {
-    try { return new Intl.DisplayNames(['uk'], {type:'language'}).of(code.split('-')[0]); }
-    catch(e){ return code; }
-  };
-
-  function setStatus(t){ $('status').textContent = t; }
+  const setStatus = t => $('status').textContent = t;
+  const scrollDown = () => { feed.scrollTop = feed.scrollHeight; };
   const errors = new Map();
   function showError(msg){
     const known = errors.get(msg);
-    if(known && known.el.isConnected){
-      known.n++; known.el.textContent = msg + '  (×' + known.n + ')'; return;
-    }
+    if(known && known.el.isConnected){ known.n++; known.el.textContent = msg + '  (×' + known.n + ')'; return; }
     const d = document.createElement('div'); d.className = 'err'; d.textContent = msg;
-    errors.set(msg, {el: d, n: 1});
+    errors.set(msg, {el:d, n:1});
     feed.appendChild(d); scrollDown();
   }
-  function scrollDown(){ feed.scrollTop = feed.scrollHeight; }
-  function hideEmpty(){ if(emptyEl) emptyEl.style.display = 'none'; }
-
   function makeRow(live){
-    hideEmpty();
+    emptyEl.style.display = 'none';
     const row = document.createElement('div');
     row.className = 'row' + (live ? ' live' : '');
     row.innerHTML = '<div class="tr"></div><div class="orig"><span class="lang"></span><span class="txt" dir="auto"></span></div>';
     feed.appendChild(row);
-    return {
-      el: row,
-      tr: row.querySelector('.tr'),
-      lang: row.querySelector('.lang'),
-      txt: row.querySelector('.txt')
-    };
+    return {el:row, tr:row.querySelector('.tr'), lang:row.querySelector('.lang'), txt:row.querySelector('.txt')};
   }
 
-  /* ---------- Gemini streaming ---------- */
-  async function geminiStream(system, user, temperature, maxTokens, onDelta, signal){
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model || 'gemini-3.1-flash-lite')}:streamGenerateContent?alt=sse`;
-    const res = await fetch(url, {
-      method:'POST', signal,
-      headers:{'Content-Type':'application/json','x-goog-api-key':cfg.geminiKey},
-      body: JSON.stringify({
-        systemInstruction:{parts:[{text:system}]},
-        contents:[{role:'user', parts:[{text:user}]}],
-        generationConfig:{temperature, maxOutputTokens:maxTokens}
-      })
-    });
+  /* ---------- Gemini (streaming, with retry on rate limit) ---------- */
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  async function geminiStream(parts, system, temperature, onDelta){
+    const model = cfg.model || DEFAULTS.model;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
+    const generationConfig = {temperature, maxOutputTokens:2048};
+    if(/^gemini-2\.5-(flash|pro)$/.test(model)) generationConfig.thinkingConfig = {thinkingBudget:256};
+    const body = JSON.stringify({systemInstruction:{parts:[{text:system}]}, contents:[{role:'user', parts}], generationConfig});
+
+    let res;
+    for(let attempt = 0; ; attempt++){
+      res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json','x-goog-api-key':cfg.geminiKey}, body});
+      if((res.status === 429 || res.status === 503) && attempt < 3){
+        setStatus('ліміт Gemini, чекаю…'); await sleep(5000 * (attempt + 1)); continue;
+      }
+      break;
+    }
     if(!res.ok){
-      let detail=''; try{ detail = (await res.json()).error?.message || ''; }catch(e){}
-      if(res.status === 429) throw new Error('Gemini 429: перевищено безкоштовний ліміт запитів. Зачекай хвилину.');
+      let detail = ''; try{ detail = (await res.json()).error?.message || ''; }catch(e){}
+      if(res.status === 429) throw new Error('Gemini 429: вичерпано безкоштовний ліміт запитів. Зачекай хвилину або обери модель з більшим лімітом (напр. gemini-2.5-flash-lite).');
       throw new Error(`Gemini ${res.status}: ${detail}`);
     }
     const reader = res.body.getReader(), dec = new TextDecoder();
@@ -220,92 +216,136 @@ Rules:
         const l = line.trim();
         if(!l.startsWith('data:')) continue;
         try{
-          const parts = JSON.parse(l.slice(5).trim()).candidates?.[0]?.content?.parts || [];
-          const t = parts.map(p => p.text || '').join('');
+          const ps = JSON.parse(l.slice(5).trim()).candidates?.[0]?.content?.parts || [];
+          const t = ps.map(p => p.text || '').join('');
           if(t) onDelta(t);
         }catch(e){}
       }
     }
   }
 
-  async function translate(text, onUpdate, signal){
-    const ctx = history.slice(-4);
-    const user = (ctx.length ? `Previous context (do not translate):\n${ctx.join('\n')}\n\n` : '') + `Translate:\n${text}`;
-    let out = '';
-    await geminiStream(SYSTEM, user, 0.2, 600, d => { out += d; onUpdate(out); }, signal);
+  /* ---------- audio utils ---------- */
+  function concatInt16(chunks){
+    let n = 0; chunks.forEach(c => n += c.length);
+    const out = new Int16Array(n); let o = 0;
+    chunks.forEach(c => { out.set(c, o); o += c.length; });
     return out;
   }
+  function wavBase64(int16){
+    const buf = new ArrayBuffer(44 + int16.length * 2), v = new DataView(buf);
+    const w = (o, s) => { for(let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0,'RIFF'); v.setUint32(4, 36 + int16.length * 2, true); w(8,'WAVE'); w(12,'fmt ');
+    v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+    v.setUint32(24,16000,true); v.setUint32(28,32000,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+    w(36,'data'); v.setUint32(40, int16.length * 2, true);
+    new Int16Array(buf, 44).set(int16);
+    const bytes = new Uint8Array(buf); let bin = '';
+    for(let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  // MediaStream -> 16 kHz mono Int16 frames + RMS level
+  function startCapture(stream, onFrame){
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(stream);
+    const proc = ctx.createScriptProcessor(4096, 1, 1), ratio = ctx.sampleRate / 16000;
+    proc.onaudioprocess = e => {
+      const inp = e.inputBuffer.getChannelData(0), n = Math.floor(inp.length / ratio), out = new Int16Array(n);
+      let sq = 0;
+      for(let i = 0; i < n; i++){
+        const a = Math.floor(i * ratio), b = Math.max(a + 1, Math.floor((i + 1) * ratio)); let sum = 0;
+        for(let j = a; j < b && j < inp.length; j++) sum += inp[j];
+        const x = Math.max(-1, Math.min(1, sum / (b - a)));
+        sq += x * x; out[i] = x < 0 ? x * 0x8000 : x * 0x7FFF;
+      }
+      onFrame(out, Math.sqrt(sq / n));
+    };
+    src.connect(proc);
+    const mute = ctx.createGain(); mute.gain.value = 0; proc.connect(mute); mute.connect(ctx.destination);
+    if(ctx.state === 'suspended') ctx.resume();
+    return {stop(){ try{ proc.disconnect(); src.disconnect(); }catch(e){} try{ ctx.close(); }catch(e){} }};
+  }
+  // Cuts continuous audio into phrases on pauses
+  function makeSegmenter(onSegment){
+    let pre = [], seg = [], speaking = false, silenceMs = 0, speechMs = 0, totalMs = 0, floor = 0.004;
+    const reset = () => { seg = []; speaking = false; silenceMs = speechMs = totalMs = 0; };
+    const flush = () => { if(speechMs >= 300) onSegment(concatInt16(seg)); reset(); };
+    return {
+      push(pcm, rms){
+        const ms = pcm.length / 16, voiced = rms > Math.max(0.012, floor * 3);
+        if(!speaking){
+          if(voiced){ speaking = true; seg = [...pre, pcm]; pre = []; speechMs = ms; totalMs = ms * seg.length; silenceMs = 0; }
+          else { floor = floor * 0.95 + rms * 0.05; pre.push(pcm); if(pre.length > 3) pre.shift(); }
+        }else{
+          seg.push(pcm); totalMs += ms;
+          if(voiced){ speechMs += ms; silenceMs = 0; } else silenceMs += ms;
+          if(silenceMs >= 650 || totalMs >= 14000) flush();
+        }
+      },
+      flush(){ if(speaking) flush(); }
+    };
+  }
 
-  /* ---------- interim (live) translation, throttled ---------- */
-  function onInterim(text, lang){
-    interimText = text;
-    if(!liveRow) liveRow = makeRow(true);
-    liveRow.txt.textContent = text;
-    if(lang){ liveRow.lang.textContent = lang.split('-')[0]; $('detected').textContent = 'розпізнано: ' + langName(lang); }
-    scrollDown();
-  }
-  function scheduleInterim(){
-    if(interimOff) return;
-    if(interimBusy){ interimPending = true; return; }
-    clearTimeout(interimTimer);
-    interimTimer = setTimeout(runInterim, Math.max(0, 550 - (Date.now() - interimAt)));
-  }
-  async function runInterim(){
-    const text = interimText, seq = ++interimSeq;
-    if(!text || text.length < 6 || !liveRow) return;
-    interimBusy = true; interimAt = Date.now();
-    interimCtrl = new AbortController();
-    try{
-      await translate(text, t => { if(seq === interimSeq && liveRow) { liveRow.tr.textContent = t; scrollDown(); } }, interimCtrl.signal);
-    }catch(e){ if(e.name !== 'AbortError'){ interimOff = true; showError(e.message); } }
-    finally{
-      interimBusy = false;
-      if(interimPending){ interimPending = false; scheduleInterim(); }
-    }
-  }
+  /* ---------- listening: tab/system audio or microphone -> Gemini ---------- */
+  const history = [];                 // {orig, ukr}
+  const queue = []; let working = false;
+  let running = false, capStream = null, cap = null, segmenter = null;
 
-  /* ---------- final phrase: polished translation with context ---------- */
-  async function onFinal(text, lang){
-    clearTimeout(interimTimer); interimSeq++; interimPending = false;
-    if(interimCtrl) interimCtrl.abort();
-    const row = liveRow || makeRow(false);
-    liveRow = null; interimText = '';
+  function parseReply(t){
+    const lang = (t.match(/LANG:\s*([^\n]*)/) || [])[1]?.trim() || '';
+    const o = t.match(/ORIGINAL:\s*([\s\S]*?)(?=\nUKRAINIAN:|$)/);
+    const u = t.match(/UKRAINIAN:\s*([\s\S]*)$/);
+    return {lang, orig: o ? o[1].trim() : '', ukr: u ? u[1].trim() : ''};
+  }
+  function updateStatus(){
+    if(!running) return;
+    setStatus('слухаю' + (queue.length || working ? ` · у черзі ${queue.length + (working ? 1 : 0)}` : ''));
+  }
+  async function processSegment(seg){
+    const row = seg.row;
+    const ctxLines = history.slice(-4).map(h => `${h.orig}  =>  ${h.ukr}`).join('\n');
+    const parts = [
+      {text: (ctxLines ? `Previous context (original => Ukrainian), do not repeat it:\n${ctxLines}\n\n` : '') + 'Interpret this audio clip.'},
+      {inlineData:{mimeType:'audio/wav', data: seg.b64}}
+    ];
+    let acc = '';
+    await geminiStream(parts, listenPrompt(), 0.1, d => {
+      acc += d;
+      const p = parseReply(acc);
+      if(/^none$/i.test(p.lang)) return;
+      if(p.lang){ row.lang.textContent = p.lang.toLowerCase().slice(0, 3); $('detected').textContent = 'розпізнано: ' + ukName(p.lang); }
+      if(p.orig) row.txt.textContent = p.orig;
+      if(p.ukr){ row.tr.textContent = p.ukr; }
+      scrollDown();
+    });
+    const p = parseReply(acc);
+    if(/^none$/i.test(p.lang) || (!p.orig && !p.ukr)){ row.el.remove(); return; }
     row.el.classList.remove('live');
-    row.txt.textContent = text;
-    row.lang.textContent = (lang || '??').split('-')[0];
-    if(lang) $('detected').textContent = 'розпізнано: ' + langName(lang);
-
-    if(lang && lang.toLowerCase().startsWith('uk')){ row.tr.textContent = text; history.push(text); return; }
-    try{
-      const final = await translate(text, t => { row.tr.textContent = t; scrollDown(); }, undefined);
-      row.tr.textContent = final || row.tr.textContent;
-      interimOff = false;
-    }catch(e){ showError(e.message); }
-    history.push(text);
+    history.push({orig: p.orig, ukr: p.ukr || p.orig});
     if(history.length > 20) history.shift();
   }
-
-  /* ---------- Azure Speech with continuous language detection ---------- */
-  let capStream = null;
-  async function start(){
-    if(!cfg.speechKey || !cfg.region || !cfg.geminiKey){
-      $('settings').showModal(); return;
+  async function pump(){
+    if(working) return;
+    working = true;
+    while(queue.length){
+      updateStatus();
+      const seg = queue.shift();
+      try{ await processSegment(seg); }
+      catch(e){ seg.row.el.remove(); showError(e.message); }
     }
-    if(typeof SpeechSDK === 'undefined'){ showError('Не вдалось завантажити Azure Speech SDK. Перевір інтернет і онови сторінку.'); return; }
+    working = false; updateStatus(); if(!running) setStatus('очікування');
+  }
+  function onSegment(int16){
+    const row = makeRow(true);
+    row.tr.textContent = '…'; row.txt.textContent = 'розпізнаю…'; scrollDown();
+    queue.push({b64: wavBase64(int16), row});
+    updateStatus(); pump();
+  }
 
-    const SHORT = {en:'en-US',ru:'ru-RU',pl:'pl-PL',de:'de-DE',es:'es-ES',fr:'fr-FR',it:'it-IT',pt:'pt-PT',
-                   uk:'uk-UA',tr:'tr-TR',cs:'cs-CZ',ja:'ja-JP',zh:'zh-CN',ko:'ko-KR',nl:'nl-NL',sv:'sv-SE',vi:'vi-VN',ar:'ar-SA'};
-    const norm = c => {
-      const p = c.split('-');
-      if(p.length === 1) return SHORT[p[0].toLowerCase()] || c;
-      return p[0].toLowerCase() + '-' + p[1].toUpperCase();
-    };
-    const langs = [...new Set(cfg.langs.split(/[,;\s]+/).filter(Boolean).map(norm))].slice(0, 10);
-    if(!langs.length){ showError('Вкажи хоча б одну мову в налаштуваннях, напр.: en-US,ru-RU,pl-PL,de-DE'); return; }
-    setStatus('мови: ' + langs.join(' '));
+  async function start(){
+    if(!cfg.geminiKey){ $('settings').showModal(); return; }
     capStream = null;
-    if($('source').value === 'system'){
-      try{
+    try{
+      if($('source').value === 'system'){
         const ds = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
         if(!ds.getAudioTracks().length){
           ds.getTracks().forEach(t => t.stop());
@@ -314,198 +354,148 @@ Rules:
         ds.getVideoTracks().forEach(t => t.stop());
         capStream = new MediaStream(ds.getAudioTracks());
         capStream.getAudioTracks()[0].onended = () => stop();
-      }catch(e){ showError('Не вдалось захопити звук: ' + e.message); return; }
-    }
-    try{
-      const speechConfig = SpeechSDK.SpeechConfig.fromEndpoint(
-        new URL(`wss://${cfg.region.trim()}.stt.speech.microsoft.com/speech/universal/v2`), cfg.speechKey.trim());
-      speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_LanguageIdMode, 'Continuous');
-      const auto = SpeechSDK.AutoDetectSourceLanguageConfig.fromLanguages(langs);
-      const audio = capStream ? SpeechSDK.AudioConfig.fromStreamInput(capStream) : SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-      recognizer = SpeechSDK.SpeechRecognizer.FromConfig(speechConfig, auto, audio);
-    }catch(e){ showError('Помилка ініціалізації: ' + e.message); return; }
-
-    const langOf = r => { try{ return SpeechSDK.AutoDetectSourceLanguageResult.fromResult(r).language; }catch(e){ return ''; } };
-
-    recognizer.recognizing = (s, e) => { if(e.result.text) onInterim(e.result.text, langOf(e.result)); };
-    recognizer.recognized = (s, e) => {
-      if(e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text.trim())
-        onFinal(e.result.text.trim(), langOf(e.result));
-    };
-    recognizer.canceled = (s, e) => {
-      if(e.reason === SpeechSDK.CancellationReason.Error){
-        let msg = 'Speech: ' + e.errorDetails;
-        if(String(e.errorDetails).includes('1007'))
-          msg += '\nAzure не прийняв один із кодів мов або регіон не підтримує безперервне визначення мови. Відкрий ⚙ і постав мови у форматі en-US,ru-RU,pl-PL,de-DE (по одній на мову, без зайвих символів); якщо не допоможе — спробуй регіон westeurope або eastus.';
-        showError(msg);
+      }else{
+        capStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, echoCancellation:false, noiseSuppression:false, autoGainControl:true}});
       }
-      stop();
-    };
-
-    recognizer.startContinuousRecognitionAsync(
-      () => { running = true; $('mic').classList.add('on'); setStatus('слухаю…'); },
-      err => { showError('Не вдалось запустити: ' + err); }
-    );
+    }catch(e){ showError('Не вдалось отримати звук: ' + e.message); return; }
+    segmenter = makeSegmenter(onSegment);
+    cap = startCapture(capStream, (pcm, rms) => {
+      if('speechSynthesis' in window && speechSynthesis.speaking) return;   // не слухаємо власне озвучення
+      segmenter.push(pcm, rms);
+    });
+    running = true; $('mic').classList.add('on'); updateStatus(); setStatus('слухаю');
   }
-
   function stop(){
+    if(segmenter){ segmenter.flush(); segmenter = null; }
+    if(cap){ cap.stop(); cap = null; }
     if(capStream){ capStream.getTracks().forEach(t => t.stop()); capStream = null; }
-    if(recognizer){
-      const r = recognizer; recognizer = null;
-      r.stopContinuousRecognitionAsync(() => r.close(), () => r.close());
-    }
-    running = false; $('mic').classList.remove('on'); setStatus('очікування');
+    running = false; $('mic').classList.remove('on'); setStatus(queue.length ? 'доперекладаю…' : 'очікування');
   }
 
-  /* ---------- Push-to-talk: мій голос → переклад → озвучення ---------- */
-  const MY_LANG = 'uk-UA';   // якою мовою говориш ти
+  /* ---------- push-to-talk: my voice -> Gemini -> spoken translation ---------- */
   const TGT = {
-    'en-US':['English','en-US-JennyNeural'],'vi-VN':['Vietnamese','vi-VN-HoaiMyNeural'],'ar-SA':['Arabic','ar-SA-ZariyahNeural'],
-    'ru-RU':['Russian','ru-RU-SvetlanaNeural'],'pl-PL':['Polish','pl-PL-ZofiaNeural'],'de-DE':['German','de-DE-KatjaNeural'],
-    'es-ES':['Spanish','es-ES-ElviraNeural'],'fr-FR':['French','fr-FR-DeniseNeural'],'it-IT':['Italian','it-IT-ElsaNeural'],
-    'tr-TR':['Turkish','tr-TR-EmelNeural'],'zh-CN':['Chinese','zh-CN-XiaoxiaoNeural'],'ja-JP':['Japanese','ja-JP-NanamiNeural'],
-    'ko-KR':['Korean','ko-KR-SunHiNeural'],'cs-CZ':['Czech','cs-CZ-VlastaNeural']
+    'en-US':'English','vi-VN':'Vietnamese','ar-SA':'Arabic','ru-RU':'Russian','pl-PL':'Polish','de-DE':'German',
+    'es-ES':'Spanish','fr-FR':'French','it-IT':'Italian','tr-TR':'Turkish','zh-CN':'Chinese','ja-JP':'Japanese',
+    'ko-KR':'Korean','cs-CZ':'Czech'
   };
   try{ const t = localStorage.getItem('live_translator_tgt'); if(t && TGT[t]) $('tgt').value = t; }catch(e){}
-  $('tgt').onchange = () => { try{ localStorage.setItem('live_translator_tgt', $('tgt').value); }catch(e){} synth = null; };
+  $('tgt').onchange = () => { try{ localStorage.setItem('live_translator_tgt', $('tgt').value); }catch(e){} };
 
-  let pttRec = null, pttBusy = false, pttHeld = false, pttStarted = false, pttText = [];
-  let synth = null, synthVoice = '', speakChain = Promise.resolve();
-
-  function getSynth(){
-    const voice = TGT[$('tgt').value][1];
-    if(synth && synthVoice === voice) return synth;
-    if(synth){ try{ synth.close(); }catch(e){} }
-    const sc = SpeechSDK.SpeechConfig.fromSubscription(cfg.speechKey, cfg.region);
-    sc.speechSynthesisVoiceName = voice;
-    sc.speechSynthesisOutputFormat = SpeechSDK.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
-    synth = new SpeechSDK.SpeechSynthesizer(sc, SpeechSDK.AudioConfig.fromDefaultSpeakerOutput());
-    synthVoice = voice;
-    try{ SpeechSDK.Connection.fromSynthesizer(synth).openConnection(); }catch(e){}
-    return synth;
+  let voices = [], warnedVoice = false;
+  const loadVoices = () => { if('speechSynthesis' in window) voices = speechSynthesis.getVoices(); };
+  loadVoices();
+  if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = loadVoices;
+  function pickVoice(code){
+    const full = code.toLowerCase(), short = full.split('-')[0];
+    const match = voices.filter(v => v.lang.replace('_','-').toLowerCase() === full)
+      .concat(voices.filter(v => v.lang.toLowerCase().startsWith(short)));
+    return match.find(v => /premium|enhanced|natural|neural/i.test(v.name)) || match[0] || null;
   }
   function speak(text){
-    if(!text.trim()) return;
-    speakChain = speakChain.then(() => new Promise(res => {
-      getSynth().speakTextAsync(text, r => {
-        if(r.reason === SpeechSDK.ResultReason.Canceled) showError('Озвучення: ' + r.errorDetails);
-        res();
-      }, e => { showError('Озвучення: ' + e); res(); });
-    }));
+    if(!text.trim() || !('speechSynthesis' in window)) return;
+    const code = $('tgt').value, u = new SpeechSynthesisUtterance(text);
+    u.lang = code;
+    const v = pickVoice(code);
+    if(v) u.voice = v;
+    else if(!warnedVoice){
+      warnedVoice = true;
+      showError('У системі немає голосу для цієї мови, тому озвучення може звучати неправильно. На Mac: Системні налаштування → Універсальний доступ → Мовлення → Системний голос → Керувати голосами.');
+    }
+    speechSynthesis.speak(u);
   }
 
-  async function translateAndSpeak(text, row){
-    const [lang] = TGT[$('tgt').value];
-    const system = `You are a speech interpreter. Translate the user's text into natural, fluent spoken ${lang}. Keep meaning, tone and names. Output ONLY the translation.`;
-    let full = '', buf = '';
-    await geminiStream(system, text, 0.1, 500, d => {
-      full += d; buf += d; row.tr.textContent = full; scrollDown();
-      let m;
-      while((m = buf.match(/^([\s\S]*?[.!?…؟。！？]+)\s+([\s\S]*)$/))){ speak(m[1]); buf = m[2]; }
-    });
-    speak(buf);
-  }
-
-  /* Мікрофон завжди готовий + пре-ролл 0.5с, щоб перші слова не губились */
-  let mic = null, preroll = [], talking = false, pushStream = null;
-  async function initMic(){
-    if(mic) return mic;
+  let pttMic = null, pttPre = [], pttBuf = [], talking = false, pttHeld = false, pttBusy = false;
+  async function initPttMic(){
+    if(pttMic) return;
     const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, echoCancellation:true, noiseSuppression:true}});
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const proc = ctx.createScriptProcessor(2048, 1, 1), ratio = ctx.sampleRate / 16000;
-    proc.onaudioprocess = e => {
-      const inp = e.inputBuffer.getChannelData(0), n = Math.floor(inp.length / ratio), out = new Int16Array(n);
-      for(let i = 0; i < n; i++){
-        const a = Math.floor(i * ratio), b = Math.max(a + 1, Math.floor((i + 1) * ratio)); let sum = 0;
-        for(let j = a; j < b && j < inp.length; j++) sum += inp[j];
-        const v = Math.max(-1, Math.min(1, sum / (b - a)));
-        out[i] = v < 0 ? v * 0x8000 : v * 0x7FFF;
-      }
-      if(talking && pushStream) pushStream.write(out.buffer);
-      else { preroll.push(out.buffer); if(preroll.length > 12) preroll.shift(); }
-    };
-    ctx.createMediaStreamSource(stream).connect(proc); proc.connect(ctx.destination);
-    mic = {ctx, stream};
-    return mic;
+    const c = startCapture(stream, pcm => {
+      if(talking) pttBuf.push(pcm); else { pttPre.push(pcm); if(pttPre.length > 3) pttPre.shift(); }
+    });
+    pttMic = {stream, c};
   }
-
   async function pttStart(){
     if(pttBusy) return;
-    if(!cfg.speechKey || !cfg.region || !cfg.geminiKey){ $('settings').showModal(); return; }
-    pttBusy = true; pttHeld = true; pttStarted = false; pttText = [];
+    if(!cfg.geminiKey){ $('settings').showModal(); return; }
+    pttBusy = true; pttHeld = true;
     $('ptt').classList.add('on'); setStatus('говори…');
     try{
-      getSynth();
-      await initMic();
-      if(mic.ctx.state === 'suspended') await mic.ctx.resume();
-      if(!pttHeld){ pttReset(); return; }          // відпустив, поки чекали дозвіл
-      pushStream = SpeechSDK.AudioInputStream.createPushStream(SpeechSDK.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1));
-      preroll.forEach(b => pushStream.write(b)); preroll = [];
-      talking = true;
-      const sc = SpeechSDK.SpeechConfig.fromSubscription(cfg.speechKey, cfg.region);
-      sc.speechRecognitionLanguage = MY_LANG;
-      pttRec = new SpeechSDK.SpeechRecognizer(sc, SpeechSDK.AudioConfig.fromStreamInput(pushStream));
-      pttRec.recognized = (s, e) => { if(e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) pttText.push(e.result.text); };
-      pttRec.canceled = (s, e) => { if(e.reason === SpeechSDK.CancellationReason.Error){
-        let m = 'Speech: ' + e.errorDetails;
-        if(String(e.errorDetails).includes('1007')) m += '\nЛіміт Azure Speech: вимкни 🎙 (основний запис), якщо він увімкнений, і перевір тариф ресурсу (Free F0 дозволяє лише 1 одночасний запит і 5 год/міс).';
-        showError(m); } };
-      pttRec.startContinuousRecognitionAsync(() => {}, err => { showError('Speech: ' + err); pttReset(); });
-      pttStarted = true;
+      await initPttMic();
+      if(!pttHeld){ pttReset(); return; }
+      pttBuf = [...pttPre]; pttPre = []; talking = true;
     }catch(e){ showError('Мікрофон: ' + e.message); pttReset(); }
   }
-  function pttReset(){ talking = false; pttBusy = false; pttHeld = false; pttStarted = false; $('ptt').classList.remove('on'); setStatus('очікування'); }
-  function pttEnd(){ pttHeld = false; if(pttStarted) pttFinish(); }
-  async function pttFinish(){
-    pttStarted = false; $('ptt').classList.remove('on'); setStatus('переклад…');
-    await new Promise(r => setTimeout(r, 250));     // дописуємо кінець фрази
-    talking = false; try{ pushStream.close(); }catch(e){}
-    const r = pttRec; pttRec = null;
-    r.stopContinuousRecognitionAsync(async () => {
-      r.close();
-      const text = pttText.join(' ').trim();
-      if(!text){ pttReset(); setStatus('не почув, спробуй ще'); return; }
-      const row = makeRow(false);
-      row.lang.textContent = '→ ' + $('tgt').value.split('-')[0].toUpperCase();
-      row.txt.textContent = text; row.tr.textContent = '…'; scrollDown();
-      try{ await translateAndSpeak(text, row); }catch(e){ row.tr.textContent = ''; showError(e.message); }
-      pttReset();
-    }, e => { r.close(); showError('Speech: ' + e); pttReset(); });
+  function pttReset(){ talking = false; pttBusy = false; pttHeld = false; $('ptt').classList.remove('on'); setStatus(running ? 'слухаю' : 'очікування'); }
+  async function pttEnd(){
+    pttHeld = false;
+    if(!talking){ return; }
+    $('ptt').classList.remove('on'); setStatus('переклад…');
+    await sleep(250);
+    talking = false;
+    const pcm = concatInt16(pttBuf); pttBuf = [];
+    if(pcm.length < 16000 * 0.3){ pttReset(); setStatus('надто коротко, спробуй ще'); return; }
+    const target = TGT[$('tgt').value];
+    const row = makeRow(false);
+    row.lang.textContent = '→ ' + $('tgt').value.split('-')[0].toUpperCase();
+    row.txt.textContent = '…'; row.tr.textContent = '…'; scrollDown();
+    const system = `You are a speech interpreter. The audio is the user's speech (usually Ukrainian). Transcribe it exactly, then translate it into natural, fluent spoken ${target}, keeping meaning, tone, register and names.
+Output EXACTLY this format and nothing else:
+ORIGINAL: <transcript>
+TRANSLATION: <translation>`;
+    const parts = [{text:'Interpret this audio.'}, {inlineData:{mimeType:'audio/wav', data: wavBase64(pcm)}}];
+    let acc = '', spoken = 0;
+    try{
+      await geminiStream(parts, system, 0.1, d => {
+        acc += d;
+        const o = acc.match(/ORIGINAL:\s*([\s\S]*?)(?=\nTRANSLATION:|$)/);
+        const t = acc.match(/TRANSLATION:\s*([\s\S]*)$/);
+        if(o) row.txt.textContent = o[1].trim();
+        if(t){
+          const tr = t[1];
+          row.tr.textContent = tr.trim(); scrollDown();
+          let m;
+          while((m = tr.slice(spoken).match(/^([\s\S]*?[.!?…؟。！？]+)\s+/))){ speak(m[1]); spoken += m[0].length; }
+        }
+      });
+      const t = acc.match(/TRANSLATION:\s*([\s\S]*)$/);
+      if(t) speak(t[1].slice(spoken));
+      else row.tr.textContent = '';
+    }catch(e){ row.tr.textContent = ''; showError(e.message); }
+    pttReset();
   }
   const pb = $('ptt');
   pb.addEventListener('pointerdown', e => { e.preventDefault(); try{ pb.setPointerCapture(e.pointerId); }catch(_){} pttStart(); });
   ['pointerup','pointercancel'].forEach(ev => pb.addEventListener(ev, pttEnd));
   pb.addEventListener('contextmenu', e => e.preventDefault());
 
-  $('source').addEventListener('change', () => { $('mic').textContent = $('source').value === 'system' ? '🔊' : '🎙'; });
-
   /* ---------- UI wiring ---------- */
+  $('source').addEventListener('change', () => { $('mic').textContent = $('source').value === 'system' ? '🔊' : '🎙'; });
   $('mic').onclick = () => running ? stop() : start();
   $('clear').onclick = () => {
     feed.querySelectorAll('.row,.err').forEach(n => n.remove());
-    liveRow = null; history.length = 0; emptyEl.style.display = '';
+    errors.clear(); history.length = 0; queue.length = 0; emptyEl.style.display = '';
   };
-  $('openSettings').onclick = () => {
-    FIELDS.forEach(f => $(f).value = cfg[f] || '');
-    $('settings').showModal();
-  };
+  $('openSettings').onclick = () => { FIELDS.forEach(f => $(f).value = cfg[f] || ''); $('settings').showModal(); };
   $('closeSettings').onclick = () => $('settings').close();
-  $('testSettings').onclick = async () => {
-    const out = $('testResult'), saved = {...cfg};
-    FIELDS.forEach(f => cfg[f] = $(f).value.trim());
-    out.style.color = ''; out.textContent = 'Перевіряю…';
-    try{
-      const r = await translate('Good morning, how are you today?', () => {});
-      out.style.color = 'var(--ok)'; out.textContent = 'Працює: ' + r;
-    }catch(e){ out.style.color = '#ff8a8a'; out.textContent = e.message; }
-    cfg = saved;
-  };
   $('saveSettings').onclick = () => {
     FIELDS.forEach(f => cfg[f] = $(f).value.trim());
+    if(!cfg.model) cfg.model = DEFAULTS.model;
     try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(e){}
     $('settings').close();
   };
+  $('testSettings').onclick = async () => {
+    const out = $('testResult'), saved = {...cfg};
+    FIELDS.forEach(f => cfg[f] = $(f).value.trim());
+    if(!cfg.model) cfg.model = DEFAULTS.model;
+    out.style.color = ''; out.textContent = 'Перевіряю…';
+    let r = '';
+    try{
+      await geminiStream([{text:'Chào bạn, hôm nay bạn khỏe không?'}], 'Translate the user text into natural Ukrainian. Output only the translation.', 0.1, d => { r += d; });
+      out.style.color = 'var(--ok)'; out.textContent = 'Працює (' + cfg.model + '): ' + r;
+    }catch(e){ out.style.color = '#ff8a8a'; out.textContent = e.message; }
+    cfg = saved;
+  };
 })();
 </script>
+
 </body>
 </html>
