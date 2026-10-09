@@ -112,9 +112,9 @@
 
   <label>Gemini API — ключ (безкоштовний: aistudio.google.com)</label>
   <input id="geminiKey" type="password" autocomplete="off">
-  <label>Модель Gemini (для найкращої якості спробуй gemini-2.5-pro; швидше — gemini-2.5-flash)</label>
-  <input id="model" list="models" placeholder="gemini-2.5-flash">
-  <datalist id="models"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"><option value="gemini-2.5-flash-lite"></datalist>
+  <label>Модель Gemini (якщо помилка 404 — впиши модель із повідомлення)</label>
+  <input id="model" list="models" placeholder="gemini-3.8-flash">
+  <datalist id="models"><option value="gemini-3.8-flash"><option value="gemini-3.5-flash-lite"></datalist>
 
   <label>Мови, які очікуєш почути (підказка для точності, через кому)</label>
   <input id="langs" placeholder="en-US,ru-RU,pl-PL,de-DE">
@@ -132,11 +132,11 @@
   const $ = id => document.getElementById(id);
   const CFG_KEY = 'live_translator_cfg_v1';
   const FIELDS = ['geminiKey','model','langs'];
-  const DEFAULTS = {geminiKey:'', model:'gemini-2.5-flash', langs:'vi-VN,en-US,ar-SA'};
+  const DEFAULTS = {geminiKey:'', model:'gemini-3.8-flash', langs:'vi-VN,en-US,ar-SA'};
 
   let cfg = {...DEFAULTS};
   try { cfg = {...DEFAULTS, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}')}; } catch(e){}
-  if(!cfg.model || cfg.model === 'gemini-3.1-flash-lite') cfg.model = DEFAULTS.model;
+  if(!cfg.model || /^gemini-(3\.1-flash-lite|2\.5-.*)$/.test(cfg.model)) cfg.model = DEFAULTS.model;   // старі моделі Google вже вимкнув
 
   /* ---------- prompts ---------- */
   const enName = code => { try{ return new Intl.DisplayNames(['en'], {type:'language'}).of(code.split('-')[0]); }catch(e){ return code; } };
@@ -189,12 +189,17 @@ UKRAINIAN: <translation>`;
     const model = cfg.model || DEFAULTS.model;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
     const generationConfig = {temperature, maxOutputTokens:2048};
-    if(/^gemini-2\.5-(flash|pro)$/.test(model)) generationConfig.thinkingConfig = {thinkingBudget:256};
-    const body = JSON.stringify({systemInstruction:{parts:[{text:system}]}, contents:[{role:'user', parts}], generationConfig});
+    if(/^gemini-3/.test(model)) generationConfig.thinkingConfig = {thinkingLevel:'low'};   // швидше; якщо модель не підтримує — нижче повторимо без цього
+    const mkBody = () => JSON.stringify({systemInstruction:{parts:[{text:system}]}, contents:[{role:'user', parts}], generationConfig});
+    let body = mkBody();
 
     let res;
     for(let attempt = 0; ; attempt++){
       res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json','x-goog-api-key':cfg.geminiKey}, body});
+      if(res.status === 400 && generationConfig.thinkingConfig){
+        const txt = await res.clone().text().catch(() => '');
+        if(/think/i.test(txt)){ delete generationConfig.thinkingConfig; body = mkBody(); attempt--; continue; }
+      }
       if((res.status === 429 || res.status === 503) && attempt < 3){
         setStatus('ліміт Gemini, чекаю…'); await sleep(5000 * (attempt + 1)); continue;
       }
@@ -202,7 +207,8 @@ UKRAINIAN: <translation>`;
     }
     if(!res.ok){
       let detail = ''; try{ detail = (await res.json()).error?.message || ''; }catch(e){}
-      if(res.status === 429) throw new Error('Gemini 429: вичерпано безкоштовний ліміт запитів. Зачекай хвилину або обери модель з більшим лімітом (напр. gemini-2.5-flash-lite).');
+      if(res.status === 429) throw new Error('Gemini 429: вичерпано ліміт запитів для цієї моделі на вашому ключі. Зачекай хвилину або вкажи в ⚙ іншу модель (напр. gemini-3.5-flash-lite); у Google AI Studio → Rate limits видно, які моделі доступні безкоштовно.');
+      if(res.status === 404) throw new Error(`Gemini 404: ${detail}\nМодель "${model}" недоступна. Відкрий ⚙ і впиши актуальну модель із цього повідомлення (зараз gemini-3.8-flash).`);
       throw new Error(`Gemini ${res.status}: ${detail}`);
     }
     const reader = res.body.getReader(), dec = new TextDecoder();
