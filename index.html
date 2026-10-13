@@ -46,12 +46,10 @@
          display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;background:rgba(13,7,16,.9)}
   .zl{display:flex;align-items:center;justify-content:flex-end;gap:8px}
   .zr{display:flex;align-items:center;justify-content:flex-start}
-  .src{display:flex;flex-direction:column;align-items:center;gap:5px}
-  .src span{font-size:.68rem;color:var(--dim);white-space:nowrap}
-  #mic,#tab{width:54px;height:54px;flex:none;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:1.3rem;
+  #mic{width:54px;height:54px;flex:none;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:1.3rem;
        background:linear-gradient(135deg,var(--accent),var(--accent2));transition:transform .15s}
-  #mic:hover,#tab:hover{transform:scale(1.05)}
-  #mic.on,#tab.on{animation:ring 1.4s infinite}
+  #mic:hover{transform:scale(1.05)}
+  #mic.on{animation:ring 1.4s infinite}
   @keyframes ring{0%{box-shadow:0 0 0 0 rgba(255,47,126,.55)}100%{box-shadow:0 0 0 22px rgba(255,47,126,0)}}
   #status{position:absolute;left:0;right:0;top:-26px;text-align:center;font-family:var(--mono);font-size:.8rem;color:var(--dim);opacity:.55;pointer-events:none}
 
@@ -98,14 +96,14 @@
 <nav id="langs"></nav>
 
 <main id="feed">
-  <div class="empty" id="empty">Обери мову мовця зверху. Натисни 🔊 «Звук екрана», щоб перекладати відео чи дзвінок (у вікні вибери вкладку й постав галочку «Поділитися звуком»), або 🎙, щоб слухати мікрофон. Переклад українською з'являється одразу під час мови. ✨ біля фрази покращує переклад через Gemini. Затисни 🗣 і говори українською, щоб почути переклад вголос.</div>
+  <div class="empty" id="empty">Обери мову мовця зверху, джерело звуку (мікрофон або звук вкладки) і натисни кнопку. Переклад українською з'являється одразу, прямо під час мови. Кнопка ✨ біля фрази покращує переклад через Gemini. Затисни 🗣 і говори українською, щоб почути переклад вголос.</div>
 </main>
 
 <footer>
   <div id="status">очікування</div>
   <div class="zl">
-    <div class="src"><button id="tab" title="Слухати звук з екрана / вкладки (відео, дзвінок)">🔊</button><span>Звук екрана</span></div>
-    <div class="src"><button id="mic" title="Слухати мікрофон">🎙</button><span>Мікрофон</span></div>
+    <select id="source" title="Джерело звуку"><option value="mic">🎙 Мікрофон</option><option value="system">🔊 Звук вкладки/ПК</option></select>
+    <button id="mic" title="Слухати й перекладати українською">🎙</button>
   </div>
   <button id="ptt" title="Затисни і говори українською: переклад + озвучення">🗣</button>
   <div class="zr">
@@ -295,8 +293,7 @@
   }
 
   /* ---------- listening: Web Speech (mic or tab audio track) ---------- */
-  let running = false, rec = null, capStream = null, capTrack = null, liveRow = null, activeKind = null;
-  const setOn = k => { activeKind = k; $('tab').classList.toggle('on', k === 'system'); $('mic').classList.toggle('on', k === 'mic'); };
+  let running = false, rec = null, capStream = null, capTrack = null, liveRow = null;
   let interimText = '', interimBusy = false, paused = false;
 
   async function prepareTranslator(){
@@ -383,13 +380,13 @@
     setStatus('слухаю');
   }
 
-  async function start(kind){
+  async function start(){
     if(!SR){ showError('Потрібен Google Chrome (або Edge) на комп\'ютері.'); return; }
     setStatus('готую переклад…');
     await prepareTranslator();
     capStream = null; capTrack = null;
     try{
-      if(kind === 'system'){
+      if($('source').value === 'system'){
         const ds = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
         if(!ds.getAudioTracks().length){
           ds.getTracks().forEach(t => t.stop());
@@ -401,7 +398,7 @@
         capTrack.onended = () => stop();
       }
     }catch(e){ showError('Не вдалось захопити звук: ' + e.message); setStatus('очікування'); return; }
-    running = true; setOn(kind);
+    running = true; $('mic').classList.add('on');
     rec = buildRec(); startRec(); setStatus('слухаю');
   }
   function stop(){
@@ -410,7 +407,7 @@
     try{ r && r.stop(); }catch(e){}
     if(capStream){ capStream.getTracks().forEach(t => t.stop()); capStream = null; capTrack = null; }
     liveRow = null; interimText = '';
-    setOn(null); setStatus('очікування');
+    $('mic').classList.remove('on'); setStatus('очікування');
   }
 
   /* ---------- push-to-talk: мій голос → переклад → озвучення ---------- */
@@ -483,9 +480,8 @@
   pb.addEventListener('contextmenu', e => e.preventDefault());
 
   /* ---------- UI wiring ---------- */
-  const toggle = kind => { if(running){ const same = activeKind === kind; stop(); if(same) return; } start(kind); };
-  $('tab').onclick = () => toggle('system');
-  $('mic').onclick = () => toggle('mic');
+  $('source').addEventListener('change', () => { $('mic').textContent = $('source').value === 'system' ? '🔊' : '🎙'; });
+  $('mic').onclick = () => running ? stop() : start();
   $('clear').onclick = () => {
     feed.querySelectorAll('.row,.err').forEach(n => n.remove());
     errors.clear(); history.length = 0; liveRow = null; interimText = ''; emptyEl.style.display = '';
