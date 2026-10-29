@@ -350,30 +350,62 @@
   $('tgt').onchange = () => { try{ localStorage.setItem('live_translator_tgt', $('tgt').value); }catch(e){} };
 
   // мікрофон для PTT тримаємо відкритим + пре-ролл ~0.5 с, щоб перші слова не губились
-  let pttMic = null, preroll = [], talking = false, pttWs = null, pttQueue = [], pttBusy = false, pttHeld = false;
+  let pttMic = null, pttUntap = null, preroll = [], talking = false, pttWs = null, pttQueue = [], pttBusy = false, pttHeld = false;
+  function releasePttMic(){
+    if(pttUntap){ pttUntap(); pttUntap = null; }
+    if(pttMic){ pttMic.getTracks().forEach(t => t.stop()); pttMic = null; }
+    preroll = [];
+  }
   async function initPttMic(){
     if(pttMic) return;
     pttMic = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, echoCancellation:true, noiseSuppression:true}});
-    tap(pttMic, buf => {
+    pttUntap = tap(pttMic, buf => {
       if(talking){
         if(pttWs && pttWs.readyState === 1) pttWs.send(buf); else pttQueue.push(buf);
       } else { preroll.push(buf); if(preroll.length > 4) preroll.shift(); }
     });
   }
 
+  /* ---------- озвучення голосом браузера ---------- */
+  const TTS = 'speechSynthesis' in window ? window.speechSynthesis : null;
   let voices = [];
-  const loadVoices = () => { voices = speechSynthesis.getVoices(); };
-  if('speechSynthesis' in window){ loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+  const live = [];                       // тримаємо посилання, інакше Chrome інколи «губить» фразу
+  const loadVoices = () => { voices = TTS.getVoices(); };
+  if(TTS){ loadVoices(); TTS.onvoiceschanged = loadVoices; }
+  const norm = l => String(l || '').replace('_', '-').toLowerCase();
+  function pickVoice(code){
+    const c = norm(code), s = short(code);
+    const list = voices.filter(v => norm(v.lang) === c || short(v.lang) === s);
+    // найкращі — «Enhanced/Premium/Neural/Google» голоси
+    return list.find(v => /premium|enhanced|neural|natural|google/i.test(v.name)) || list.find(v => norm(v.lang) === c) || list[0] || null;
+  }
+  // викликається прямо в натисканні кнопки: Safari/Chrome дозволяють звук лише після жесту
+  function unlockTTS(){
+    if(!TTS) return;
+    try{ TTS.cancel(); const u = new SpeechSynthesisUtterance(' '); u.volume = 0; TTS.speak(u); TTS.resume(); }catch(e){}
+  }
+  let warnedVoice = '';
   function speak(text){
     text = text.trim();
-    if(!text || !('speechSynthesis' in window)) return;
-    const code = $('tgt').value, s = short(code);
+    if(!text) return;
+    if(!TTS){ showError('Цей браузер не вміє озвучувати текст.'); return; }
+    const code = $('tgt').value;
+    if(!voices.length) loadVoices();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = code;
-    const v = voices.find(v => v.lang === code) || voices.find(v => short(v.lang) === s);
+    u.lang = code; u.rate = 1; u.volume = 1;
+    const v = pickVoice(code);
     if(v) u.voice = v;
-    else showError('У браузері немає голосу для «' + langName(code) + '». Переклад показано текстом. На Mac голоси додаються в Системні параметри → Спеціальні можливості → Озвучений вміст.');
-    speechSynthesis.speak(u);
+    else if(warnedVoice !== code){
+      warnedVoice = code;
+      showError('У системі немає голосу для «' + langName(code) + '». Спробую озвучити стандартним; якщо тиша — додай голос: Mac → Системні параметри → Спеціальні можливості → Озвучений вміст → Системний голос → Керувати голосами; iPhone → Параметри → Спеціальні можливості → Озвучений вміст → Голоси.');
+    }
+    u.onend = u.onerror = ev => {
+      const i = live.indexOf(u); if(i >= 0) live.splice(i, 1);
+      if(ev.type === 'error' && ev.error && !/interrupted|canceled/.test(ev.error)) showError('Озвучення: ' + ev.error);
+    };
+    live.push(u);
+    TTS.resume();
+    TTS.speak(u);
   }
 
   async function pttStart(){
@@ -381,7 +413,6 @@
     if(!cfg.sonioxKey){ $('settings').showModal(); return; }
     pttBusy = true; pttHeld = true;
     $('ptt').classList.add('on'); setStatus('говори…');
-    try{ speechSynthesis.cancel(); }catch(e){}
     try{ await initPttMic(); getCtx(); }
     catch(e){ showError('Мікрофон: ' + e.message); return pttReset(); }
 
@@ -405,7 +436,9 @@
       context: baseContext()
     };
     let done = false;
-    const finish = () => { if(done) return; done = true; speakReady(true); row.closed = true; row.el.classList.remove('live');
+    const finish = () => { if(done) return; done = true;
+                           if(row.tNF){ row.tF += row.tNF; row.tNF = ''; }   // те, що встигло прийти, теж озвучуємо
+                           speakReady(true); row.closed = true; row.el.classList.remove('live');
                            if(!row.oF.trim()) { row.el.remove(); setStatus('не почув, спробуй ще'); } else setStatus('очікування');
                            pttWs = null; pttBusy = false; };
     try{
@@ -434,16 +467,17 @@
     setTimeout(() => {                       // дописуємо кінець фрази
       talking = false;
       if(pttWs && pttWs.readyState === 1){ pttQueue.forEach(b => pttWs.send(b)); pttQueue = []; pttWs.send(''); }
+      releasePttMic();                       // звільняємо мікрофон, щоб звук ішов у динамік на повній гучності
     }, 300);
   }
-  function pttReset(){ talking = false; pttBusy = false; pttHeld = false; $('ptt').classList.remove('on'); setStatus('очікування'); }
+  function pttReset(){ talking = false; pttBusy = false; pttHeld = false; releasePttMic(); $('ptt').classList.remove('on'); setStatus('очікування'); }
   function pttEnd(){
     if(!pttHeld) return;
     pttHeld = false; $('ptt').classList.remove('on');
     if(pttWs && pttWs.readyState === 1) endPttStream();
   }
   const pb = $('ptt');
-  pb.addEventListener('pointerdown', e => { e.preventDefault(); try{ pb.setPointerCapture(e.pointerId); }catch(_){} pttStart(); });
+  pb.addEventListener('pointerdown', e => { e.preventDefault(); try{ pb.setPointerCapture(e.pointerId); }catch(_){} unlockTTS(); pttStart(); });
   ['pointerup','pointercancel'].forEach(ev => pb.addEventListener(ev, pttEnd));
   pb.addEventListener('contextmenu', e => e.preventDefault());
 
