@@ -121,8 +121,8 @@
   <label>Імена/терміни, які треба правильно розпізнавати (через кому, необов'язково)</label>
   <textarea id="terms" placeholder="Den, Hà Nội, YouTube"></textarea>
 
-  <label>Голос озвучення Soniox (список — console.soniox.com → Text-to-speech → Voices)</label>
-  <input id="ttsVoice" placeholder="Adrian">
+  <label>Голос озвучення Soniox (жіночі: Emma, Grace, Nina; повний список — console.soniox.com → Text-to-speech → Voices)</label>
+  <input id="ttsVoice" placeholder="Emma">
 
   <div class="actions">
     <button class="btn ghost" id="closeSettings">Закрити</button>
@@ -137,12 +137,13 @@
   const MODEL = 'stt-rt-v5';
   const CFG_KEY = 'live_translator_soniox_v1';
   const FIELDS = ['sonioxKey','langs','terms','ttsVoice'];
-  const DEFAULTS = {sonioxKey:'', langs:'vi,en,ar', terms:'', ttsVoice:'Adrian'};
+  const DEFAULTS = {sonioxKey:'', langs:'vi,en,ar', terms:'', ttsVoice:'Emma'};
   const LISTEN_TARGET = 'uk';      // на яку мову перекладати те, що чуємо
   const MY_LANG = 'uk';            // якою мовою говориш ти в push-to-talk
 
   let cfg = {...DEFAULTS};
   try { cfg = {...DEFAULTS, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}')}; } catch(e){}
+  if(!cfg.ttsVoice || cfg.ttsVoice === 'Adrian') cfg.ttsVoice = 'Emma';   // жіночий голос за замовчуванням
 
   const feed = $('feed'), emptyEl = $('empty');
   const short = c => String(c || '').split(/[-_]/)[0].toLowerCase();
@@ -471,7 +472,7 @@
         if(m.audio){ gotAudio = true; carry = playPcm(m.audio, carry); }
         if(m.terminated) done();
       };
-      const conf = {model: TTS_MODEL, language: lang, voice: (cfg.ttsVoice || 'Adrian').trim(), audio_format:'pcm_s16le', sample_rate: TTS_RATE, stream_id: id};
+      const conf = {model: TTS_MODEL, language: lang, voice: (cfg.ttsVoice || 'Emma').trim(), audio_format:'pcm_s16le', sample_rate: TTS_RATE, stream_id: id};
       if(ttsKeyInBody) conf.api_key = cfg.sonioxKey.trim();
       ws.send(JSON.stringify(conf));
       ws.send(JSON.stringify({text, text_end:true, stream_id:id}));
@@ -515,12 +516,13 @@
     talking = true;
     const row = makeRow(true);
     row.lang.textContent = '→ ' + short($('tgt').value).toUpperCase();
-    let spoken = 0;
-    const speakReady = final => {
-      const rest = row.tF.slice(spoken);
-      if(final){ speak(rest); spoken = row.tF.length; return; }
-      const m = rest.match(/^[\s\S]*[.!?…؟。！？](\s|$)/);
-      if(m){ speak(m[0]); spoken += m[0].length; }
+    // говоримо одразу після відпускання кнопки — весь переклад одним шматком
+    let spoken = false, finSeen = false;
+    const speakAll = () => {
+      if(spoken) return;
+      const text = (row.tF + row.tNF).trim();
+      if(!text) return;
+      spoken = true; speak(text);
     };
     const tgt = short($('tgt').value);
     const conf = {
@@ -533,7 +535,7 @@
     let done = false;
     const finish = () => { if(done) return; done = true;
                            if(row.tNF){ row.tF += row.tNF; row.tNF = ''; }   // те, що встигло прийти, теж озвучуємо
-                           speakReady(true); row.closed = true; row.el.classList.remove('live');
+                           speakAll(); row.closed = true; row.el.classList.remove('live');
                            if(!row.oF.trim()) { row.el.remove(); setStatus('не почув, спробуй ще'); } else setStatus('очікування');
                            pttWs = null; pttBusy = false; };
     try{
@@ -542,14 +544,15 @@
         if(m.tokens){
           row.oNF = ''; row.tNF = '';
           for(const t of m.tokens){
-            if(t.text === '<end>' || t.text === '<fin>') continue;
+            if(t.text === '<fin>'){ finSeen = true; continue; }
+            if(t.text === '<end>') continue;
             if(t.translation_status === 'translation'){ if(t.is_final) row.tF += t.text; else row.tNF += t.text; }
             else { if(t.is_final) row.oF += t.text; else row.oNF += t.text; }
           }
           row.txt.innerHTML = esc(row.oF.trimStart()) + (row.oNF ? '<span class="nf">' + esc(row.oNF) + '</span>' : '');
           row.tr.innerHTML = esc(row.tF.trimStart()) + (row.tNF ? '<span class="nf">' + esc(row.tNF) + '</span>' : '') || '<span class="nf">…</span>';
           scrollDown();
-          speakReady(false);
+          if(finSeen && !row.tNF && row.tF.trim()) speakAll();   // фраза вже повністю фінальна — озвучуємо, не чекаючи закриття
         }
         if(m.finished) finish();
       }, () => finish());
@@ -559,11 +562,15 @@
   }
   function endPttStream(){
     setStatus('переклад…');
-    setTimeout(() => {                       // дописуємо кінець фрази
+    setTimeout(() => {                       // дописуємо останні склади фрази
       talking = false;
-      if(pttWs && pttWs.readyState === 1){ pttQueue.forEach(b => pttWs.send(b)); pttQueue = []; pttWs.send(''); }
+      if(pttWs && pttWs.readyState === 1){
+        pttQueue.forEach(b => pttWs.send(b)); pttQueue = [];
+        pttWs.send(JSON.stringify({type:'finalize'}));   // просимо Soniox одразу дофіналізувати все сказане
+        pttWs.send('');
+      }
       releasePttMic();                       // звільняємо мікрофон, щоб звук ішов у динамік на повній гучності
-    }, 300);
+    }, 150);
   }
   function pttReset(){ talking = false; pttBusy = false; pttHeld = false; releasePttMic(); $('ptt').classList.remove('on'); setStatus('очікування'); }
   function pttEnd(){
