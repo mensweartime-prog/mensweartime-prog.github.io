@@ -121,6 +121,9 @@
   <label>Імена/терміни, які треба правильно розпізнавати (через кому, необов'язково)</label>
   <textarea id="terms" placeholder="Den, Hà Nội, YouTube"></textarea>
 
+  <label>Голос озвучення Soniox (список — console.soniox.com → Text-to-speech → Voices)</label>
+  <input id="ttsVoice" placeholder="Adrian">
+
   <div class="actions">
     <button class="btn ghost" id="closeSettings">Закрити</button>
     <button class="btn primary" id="saveSettings">Зберегти</button>
@@ -133,8 +136,8 @@
   const WS_URL = 'wss://stt-rt.soniox.com/transcribe-websocket';
   const MODEL = 'stt-rt-v5';
   const CFG_KEY = 'live_translator_soniox_v1';
-  const FIELDS = ['sonioxKey','langs','terms'];
-  const DEFAULTS = {sonioxKey:'', langs:'vi,en,ar', terms:''};
+  const FIELDS = ['sonioxKey','langs','terms','ttsVoice'];
+  const DEFAULTS = {sonioxKey:'', langs:'vi,en,ar', terms:'', ttsVoice:'Adrian'};
   const LISTEN_TARGET = 'uk';      // на яку мову перекладати те, що чуємо
   const MY_LANG = 'uk';            // якою мовою говориш ти в push-to-talk
 
@@ -385,7 +388,7 @@
     try{ TTS.cancel(); const u = new SpeechSynthesisUtterance(' '); u.volume = 0; TTS.speak(u); TTS.resume(); }catch(e){}
   }
   let warnedVoice = '';
-  function speak(text){
+  function browserSpeak(text){
     text = text.trim();
     if(!text) return;
     if(!TTS){ showError('Цей браузер не вміє озвучувати текст.'); return; }
@@ -406,6 +409,98 @@
     live.push(u);
     TTS.resume();
     TTS.speak(u);
+  }
+
+  /* ---------- озвучення Soniox TTS (основне), голос браузера — запасний ---------- */
+  const TTS_URL = 'wss://tts-rt.soniox.com/tts-websocket', TTS_MODEL = 'tts-rt-v2', TTS_RATE = 24000;
+  let ttsWs = null, ttsReady = null, ttsKeyInBody = false, ttsSeq = 0, ttsBusy = false, ttsIdle = null, playHead = 0;
+  const ttsQueue = [], ttsHandlers = {}, ttsBadLang = new Set();
+
+  function ttsConnect(){
+    if(ttsWs && ttsWs.readyState === 1) return Promise.resolve(ttsWs);
+    if(ttsReady) return ttsReady;
+    const key = cfg.sonioxKey.trim();
+    ttsReady = new Promise((resolve, reject) => {
+      const attempt = useProto => {
+        let ws, opened = false;
+        try{ ws = useProto ? new WebSocket(TTS_URL, ['soniox-api-key', key]) : new WebSocket(TTS_URL); }
+        catch(e){ if(useProto) return attempt(false); return reject(e); }
+        ws.onopen = () => { opened = true; ttsWs = ws; ttsKeyInBody = !useProto; resolve(ws); };
+        ws.onmessage = e => {
+          let m; try{ m = JSON.parse(e.data); }catch(_){ return; }
+          const h = m.stream_id && ttsHandlers[m.stream_id];
+          if(h) h(m); else if(m.error_code) showError(sonioxError(m));
+        };
+        ws.onclose = e => {
+          if(!opened && useProto) return attempt(false);
+          if(!opened) return reject(new Error('не вдалось підключитись (код ' + e.code + ')'));
+          if(ttsWs === ws) ttsWs = null;
+          Object.keys(ttsHandlers).forEach(id => ttsHandlers[id]({stream_id:id, error_code:-1, error_message:'з\'єднання закрилось'}));
+        };
+      };
+      attempt(true);
+    }).finally(() => { ttsReady = null; });
+    return ttsReady;
+  }
+
+  // base64 PCM s16le 24 kHz → відтворюємо шматками одразу, без очікування кінця
+  function playPcm(b64, carry){
+    const bin = atob(b64);
+    let bytes = new Uint8Array((carry ? carry.length : 0) + bin.length), o = 0;
+    if(carry){ bytes.set(carry); o = carry.length; }
+    for(let i = 0; i < bin.length; i++) bytes[o + i] = bin.charCodeAt(i);
+    const even = bytes.length & ~1, rest = bytes.length > even ? bytes.slice(even) : null;
+    const n = even / 2;
+    if(n){
+      const ctx = getCtx(), dv = new DataView(bytes.buffer, 0, even), buf = ctx.createBuffer(1, n, TTS_RATE), ch = buf.getChannelData(0);
+      for(let i = 0; i < n; i++) ch[i] = dv.getInt16(i * 2, true) / 32768;
+      const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
+      playHead = Math.max(playHead, ctx.currentTime + 0.05);
+      src.start(playHead); playHead += buf.duration;
+    }
+    return rest;
+  }
+
+  function ttsStream(ws, text, lang){
+    return new Promise((resolve, reject) => {
+      const id = 's' + (++ttsSeq); let carry = null, gotAudio = false;
+      const timer = setTimeout(() => done(new Error('немає відповіді від сервера')), 20000);
+      const done = err => { clearTimeout(timer); delete ttsHandlers[id]; err ? reject(err) : resolve(gotAudio); };
+      ttsHandlers[id] = m => {
+        if(m.error_code){ const e = new Error(m.error_message || m.error_type || 'помилка'); e.code = m.error_code; e.type = m.error_type; return done(e); }
+        if(m.audio){ gotAudio = true; carry = playPcm(m.audio, carry); }
+        if(m.terminated) done();
+      };
+      const conf = {model: TTS_MODEL, language: lang, voice: (cfg.ttsVoice || 'Adrian').trim(), audio_format:'pcm_s16le', sample_rate: TTS_RATE, stream_id: id};
+      if(ttsKeyInBody) conf.api_key = cfg.sonioxKey.trim();
+      ws.send(JSON.stringify(conf));
+      ws.send(JSON.stringify({text, text_end:true, stream_id:id}));
+    });
+  }
+
+  function speak(text){
+    text = text.trim();
+    if(!text) return;
+    ttsQueue.push({text, lang: short($('tgt').value)});
+    pumpTts();
+  }
+  async function pumpTts(){
+    if(ttsBusy || !ttsQueue.length) return;
+    const item = ttsQueue.shift();
+    if(!cfg.sonioxKey || ttsBadLang.has(item.lang)){ browserSpeak(item.text); return pumpTts(); }
+    ttsBusy = true; clearTimeout(ttsIdle);
+    try{
+      const ws = await ttsConnect();
+      await ttsStream(ws, item.text, item.lang);
+    }catch(e){
+      ttsBadLang.add(item.lang);
+      showError('Озвучення Soniox: ' + e.message + (e.code === 401 || e.code === 403 ? '\nПеревір, чи ключ має доступ до Text-to-Speech у console.soniox.com.' : '') +
+                '\nДля «' + langName(item.lang) + '» тепер озвучую голосом браузера.');
+      browserSpeak(item.text);
+    }
+    ttsBusy = false;
+    ttsIdle = setTimeout(() => { if(ttsWs && !ttsBusy){ try{ ttsWs.close(); }catch(e){} ttsWs = null; } }, 30000);
+    pumpTts();
   }
 
   async function pttStart(){
@@ -477,7 +572,7 @@
     if(pttWs && pttWs.readyState === 1) endPttStream();
   }
   const pb = $('ptt');
-  pb.addEventListener('pointerdown', e => { e.preventDefault(); try{ pb.setPointerCapture(e.pointerId); }catch(_){} unlockTTS(); pttStart(); });
+  pb.addEventListener('pointerdown', e => { e.preventDefault(); try{ pb.setPointerCapture(e.pointerId); }catch(_){} getCtx(); unlockTTS(); if(cfg.sonioxKey) ttsConnect().catch(() => {}); pttStart(); });
   ['pointerup','pointercancel'].forEach(ev => pb.addEventListener(ev, pttEnd));
   pb.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -494,6 +589,7 @@
   $('saveSettings').onclick = () => {
     FIELDS.forEach(f => cfg[f] = $(f).value.trim());
     try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(e){}
+    ttsBadLang.clear(); if(ttsWs){ try{ ttsWs.close(); }catch(e){} ttsWs = null; }
     $('settings').close();
   };
 })();
