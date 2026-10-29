@@ -31,12 +31,12 @@
         display:flex;flex-direction:column;gap:22px;max-width:900px;width:100%;margin:0 auto}
   .empty{margin:auto;text-align:center;color:var(--dim);line-height:1.6;max-width:36ch}
   .row .tr{font-size:clamp(1.25rem,3.2vw,1.8rem);line-height:1.4;font-weight:500}
+  .row .tr .nf{color:#bfaecb;opacity:.75}
   .row .orig{margin-top:6px;font-size:.88rem;color:var(--dim);line-height:1.5}
+  .row .orig .nf{opacity:.6}
   .row .lang{display:inline-block;font-family:var(--mono);font-size:.65rem;letter-spacing:.08em;
              text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);
              border-radius:3px;padding:1px 6px;margin-right:8px;vertical-align:1px}
-  .row.live .tr{color:#d7c9de}
-  .row.live .orig{opacity:.8}
   .row.live::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;
                     background:var(--accent);margin-right:8px;animation:pulse 1s infinite}
   @keyframes pulse{50%{opacity:.25}}
@@ -58,10 +58,12 @@
   dialog::backdrop{background:rgba(0,0,0,.7)}
   dialog h2{font-size:1.1rem;margin-bottom:6px}
   dialog p.note{font-size:.8rem;color:var(--dim);line-height:1.5;margin-bottom:16px}
+  dialog p.note a{color:var(--accent)}
   label{display:block;font-size:.75rem;color:var(--dim);margin:12px 0 4px;font-family:var(--mono)}
-  input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);
+  input,textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);
         border-radius:6px;padding:10px;font-size:.9rem;font-family:var(--mono)}
-  input:focus{outline:none;border-color:var(--accent)}
+  textarea{min-height:60px;resize:vertical}
+  input:focus,textarea:focus{outline:none;border-color:var(--accent)}
   .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
   .btn{border:0;border-radius:8px;padding:10px 18px;font-size:.9rem;cursor:pointer;font-family:inherit}
   .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
@@ -71,7 +73,7 @@
   #source{-webkit-appearance:none;appearance:none;width:30px;height:30px;padding:0;color:transparent;cursor:pointer;border:0;border-radius:8px;
     background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M3 6l5 5 5-5' fill='none' stroke='%23c9a7c9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat}
   #source option{color:#eee;background:#1a0f1f}
-  #tgt{width:100%;max-width:150px;background:var(--panel,#1a0f1f);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit}
+  #tgt{width:100%;max-width:150px;background:#1a0f1f;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit}
 </style>
 </head>
 <body>
@@ -107,23 +109,17 @@
 </footer>
 
 <dialog id="settings">
-  <h2>Налаштування Azure</h2>
-  <p class="note">Ключі зберігаються лише в цьому браузері (localStorage) і нікуди, крім Azure, не надсилаються. У коді сайту їх немає, тож репозиторій безпечно тримати публічним.</p>
+  <h2>Налаштування Soniox</h2>
+  <p class="note">Ключ зберігається лише в цьому браузері (localStorage) і надсилається тільки в Soniox. У коді сайту його немає, тож репозиторій безпечно тримати публічним. Ключ береться в <a href="https://console.soniox.com" target="_blank" rel="noopener">console.soniox.com</a>.</p>
 
-  <label>Azure Speech — ключ</label>
-  <input id="speechKey" type="password" autocomplete="off">
-  <label>Azure Speech — регіон (напр. westeurope)</label>
-  <input id="region" placeholder="westeurope">
+  <label>Soniox API — ключ</label>
+  <input id="sonioxKey" type="password" autocomplete="off">
 
-  <label>Azure OpenAI — endpoint (https://НАЗВА.openai.azure.com)</label>
-  <input id="aoaiEndpoint" placeholder="https://my-resource.openai.azure.com">
-  <label>Azure OpenAI — ключ</label>
-  <input id="aoaiKey" type="password" autocomplete="off">
-  <label>Назва deployment (GPT-4.1)</label>
-  <input id="deployment" placeholder="gpt-4.1">
+  <label>Очікувані мови (підказка, через кому)</label>
+  <input id="langs" placeholder="vi,en,ar">
 
-  <label>Мови для розпізнавання (через кому, до 10)</label>
-  <input id="langs" placeholder="en-US,ru-RU,pl-PL,de-DE">
+  <label>Імена/терміни, які треба правильно розпізнавати (через кому, необов'язково)</label>
+  <textarea id="terms" placeholder="Den, Hà Nội, YouTube"></textarea>
 
   <div class="actions">
     <button class="btn ghost" id="closeSettings">Закрити</button>
@@ -131,45 +127,24 @@
   </div>
 </dialog>
 
-<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  const CFG_KEY = 'live_translator_cfg_v1';
-  const FIELDS = ['speechKey','region','aoaiEndpoint','aoaiKey','deployment','langs'];
-  const DEFAULTS = {speechKey:'',region:'',aoaiEndpoint:'',aoaiKey:'',deployment:    'gpt-4.1',langs:'vi-VN,en-US,ar-SA'};
-
-  /* ===== ВПИШИ СВОЇ ДАНІ ТУТ (мають пріоритет над налаштуваннями в браузері) ===== */
-  const EMBEDDED = {
-    speechKey:     '7x8b1z9R8JVmMHkKEHLpAhIm8HCjznjOV2TPRkZPfnSNrjvbKeVCJQQJ99CIACi5YpzXJ3w3AAAYACOGrRfx',
-    region:        'northeurope',
-    aoaiEndpoint:  'https://denis84848.openai.azure.com',
-    aoaiKey:       '13UCKTKBd17TbgFOAaKL5R78WKxl3SO6Bdz5rUPbg7rW3A59caZKJQQJ99CIACYeBjFXJ3w3AAAAACOGbG9x',
-    deployment:    'gpt-4.1'
-  };
+  const WS_URL = 'wss://stt-rt.soniox.com/transcribe-websocket';
+  const MODEL = 'stt-rt-v5';
+  const CFG_KEY = 'live_translator_soniox_v1';
+  const FIELDS = ['sonioxKey','langs','terms'];
+  const DEFAULTS = {sonioxKey:'', langs:'vi,en,ar', terms:''};
+  const LISTEN_TARGET = 'uk';      // на яку мову перекладати те, що чуємо
+  const MY_LANG = 'uk';            // якою мовою говориш ти в push-to-talk
 
   let cfg = {...DEFAULTS};
   try { cfg = {...DEFAULTS, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}')}; } catch(e){}
-  Object.keys(EMBEDDED).forEach(k => { if(EMBEDDED[k] && !/ВСТАВ/.test(EMBEDDED[k])) cfg[k] = EMBEDDED[k]; });
-
-  const SYSTEM = `You are a real-time simultaneous interpreter. Translate the user's text into natural, fluent Ukrainian.
-Rules:
-- Convey the MEANING and intent, not word-for-word. Resolve idioms, slang, sarcasm and implied sense into idiomatic Ukrainian.
-- Use the provided previous context only to resolve pronouns, terms and tone; never translate or repeat the context.
-- Keep proper names, brands and numbers correct. Keep the speaker's register (casual/formal).
-- If the text is already Ukrainian, return it unchanged.
-- The text may be an unfinished fragment: translate what is there smoothly, without inventing the continuation.
-- Output ONLY the Ukrainian translation, no quotes, notes or explanations.`;
 
   const feed = $('feed'), emptyEl = $('empty');
-  let recognizer = null, running = false;
-  const history = [];          // previous original sentences for context
-  let liveRow = null;
-  let interimOff = false;
-  let interimText = '', interimBusy = false, interimPending = false, interimTimer = null, interimAt = 0, interimCtrl = null, interimSeq = 0;
-
+  const short = c => String(c || '').split(/[-_]/)[0].toLowerCase();
   const langName = code => {
-    try { return new Intl.DisplayNames(['uk'], {type:'language'}).of(code.split('-')[0]); }
+    try { return new Intl.DisplayNames(['uk'], {type:'language'}).of(short(code)); }
     catch(e){ return code; }
   };
 
@@ -177,268 +152,77 @@ Rules:
   const errors = new Map();
   function showError(msg){
     const known = errors.get(msg);
-    if(known && known.el.isConnected){
-      known.n++; known.el.textContent = msg + '  (×' + known.n + ')'; return;
-    }
+    if(known && known.el.isConnected){ known.n++; known.el.textContent = msg + '  (×' + known.n + ')'; return; }
     const d = document.createElement('div'); d.className = 'err'; d.textContent = msg;
     errors.set(msg, {el: d, n: 1});
     feed.appendChild(d); scrollDown();
   }
   function scrollDown(){ feed.scrollTop = feed.scrollHeight; }
   function hideEmpty(){ if(emptyEl) emptyEl.style.display = 'none'; }
+  const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
   function makeRow(live){
     hideEmpty();
     const row = document.createElement('div');
     row.className = 'row' + (live ? ' live' : '');
-    row.innerHTML = '<div class="tr"></div><div class="orig"><span class="lang"></span><span class="txt" dir="auto"></span></div>';
+    row.innerHTML = '<div class="tr" dir="auto"></div><div class="orig"><span class="lang"></span><span class="txt" dir="auto"></span></div>';
     feed.appendChild(row);
-    return {
-      el: row,
-      tr: row.querySelector('.tr'),
-      lang: row.querySelector('.lang'),
-      txt: row.querySelector('.txt')
-    };
+    return { el: row, tr: row.querySelector('.tr'), lang: row.querySelector('.lang'), txt: row.querySelector('.txt'),
+             oF:'', oNF:'', tF:'', tNF:'', srcLang:'', closed:false };
   }
 
-  /* ---------- Azure OpenAI streaming translation ---------- */
-  async function translate(text, onUpdate, signal){
-    const base = cfg.aoaiEndpoint.replace(/\/+$/,'');
-    const url = `${base}/openai/deployments/${encodeURIComponent(cfg.deployment)}/chat/completions?api-version=2024-06-01`;
-    const ctx = history.slice(-4);
-    const user = (ctx.length ? `Previous context (do not translate):\n${ctx.join('\n')}\n\n` : '') + `Translate:\n${text}`;
-    const res = await fetch(url, {
-      method:'POST', signal,
-      headers:{'Content-Type':'application/json','api-key':cfg.aoaiKey},
-      body: JSON.stringify({
-        messages:[{role:'system',content:SYSTEM},{role:'user',content:user}],
-        temperature:0.2, max_tokens:500, stream:true
-      })
+  function sonioxError(m){
+    let msg = `Soniox ${m.error_code}: ${m.error_message || m.error_type || ''}`;
+    if(m.error_code === 401) msg += '\nПеревір ключ у ⚙ Налаштування.';
+    if(m.error_code === 402) msg += '\nЗакінчився баланс або місячний ліміт у console.soniox.com.';
+    if(m.error_code === 429) msg += '\nЗабагато одночасних з\'єднань: вимкни один із режимів і спробуй ще.';
+    return msg;
+  }
+
+  /* ---------- з'єднання з Soniox (ключ у WebSocket protocols, запасний варіант — у стартовому повідомленні) ---------- */
+  function openSoniox(conf, onMessage, onClose){
+    const key = cfg.sonioxKey.trim();
+    return new Promise((resolve, reject) => {
+      const attempt = useProto => {
+        let ws, opened = false;
+        try{ ws = useProto ? new WebSocket(WS_URL, ['soniox-api-key', key]) : new WebSocket(WS_URL); }
+        catch(e){ if(useProto) return attempt(false); return reject(e); }
+        ws.binaryType = 'arraybuffer';
+        ws.onopen = () => {
+          opened = true;
+          const start = {...conf};
+          if(!useProto) start.api_key = key;
+          ws.send(JSON.stringify(start));
+          resolve(ws);
+        };
+        ws.onmessage = e => { if(typeof e.data !== 'string') return; let m; try{ m = JSON.parse(e.data); }catch(_){ return; } onMessage(m); };
+        ws.onclose = e => {
+          if(!opened && useProto) return attempt(false);
+          if(!opened) return reject(new Error('Не вдалось підключитись до Soniox (код ' + e.code + '). Перевір інтернет і ключ.'));
+          onClose && onClose(e);
+        };
+      };
+      attempt(true);
     });
-    if(!res.ok){
-      let detail=''; try{ detail = (await res.json()).error?.message || ''; }catch(e){}
-      throw new Error(`Azure OpenAI ${res.status}: ${detail}`);
-    }
-    const reader = res.body.getReader(), dec = new TextDecoder();
-    let buf = '', out = '';
-    while(true){
-      const {done, value} = await reader.read();
-      if(done) break;
-      buf += dec.decode(value, {stream:true});
-      const lines = buf.split('\n'); buf = lines.pop();
-      for(const line of lines){
-        const s = line.trim();
-        if(!s.startsWith('data:')) continue;
-        const data = s.slice(5).trim();
-        if(data === '[DONE]') continue;
-        try{
-          const delta = JSON.parse(data).choices?.[0]?.delta?.content;
-          if(delta){ out += delta; onUpdate(out); }
-        }catch(e){}
-      }
-    }
-    return out;
   }
 
-  /* ---------- interim (live) translation, throttled ---------- */
-  function onInterim(text, lang){
-    interimText = text;
-    if(!liveRow) liveRow = makeRow(true);
-    liveRow.txt.textContent = text;
-    if(lang){ liveRow.lang.textContent = lang.split('-')[0]; $('detected').textContent = 'розпізнано: ' + langName(lang); }
-    scrollDown();
-    scheduleInterim();
-  }
-  function scheduleInterim(){
-    if(interimOff) return;
-    if(interimBusy){ interimPending = true; return; }
-    clearTimeout(interimTimer);
-    interimTimer = setTimeout(runInterim, Math.max(0, 550 - (Date.now() - interimAt)));
-  }
-  async function runInterim(){
-    const text = interimText, seq = ++interimSeq;
-    if(!text || text.length < 6 || !liveRow) return;
-    interimBusy = true; interimAt = Date.now();
-    interimCtrl = new AbortController();
-    try{
-      await translate(text, t => { if(seq === interimSeq && liveRow) { liveRow.tr.textContent = t; scrollDown(); } }, interimCtrl.signal);
-    }catch(e){ if(e.name !== 'AbortError'){ interimOff = true; showError(e.message); } }
-    finally{
-      interimBusy = false;
-      if(interimPending){ interimPending = false; scheduleInterim(); }
-    }
+  function baseContext(){
+    const terms = cfg.terms.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+    return terms.length ? {terms} : undefined;
   }
 
-  /* ---------- final phrase: polished translation with context ---------- */
-  async function onFinal(text, lang){
-    clearTimeout(interimTimer); interimSeq++; interimPending = false;
-    if(interimCtrl) interimCtrl.abort();
-    const row = liveRow || makeRow(false);
-    liveRow = null; interimText = '';
-    row.el.classList.remove('live');
-    row.txt.textContent = text;
-    row.lang.textContent = (lang || '??').split('-')[0];
-    if(lang) $('detected').textContent = 'розпізнано: ' + langName(lang);
-
-    if(lang && lang.toLowerCase().startsWith('uk')){ row.tr.textContent = text; history.push(text); return; }
-    try{
-      const final = await translate(text, t => { row.tr.textContent = t; scrollDown(); }, undefined);
-      row.tr.textContent = final || row.tr.textContent;
-      interimOff = false;
-    }catch(e){ showError(e.message); }
-    history.push(text);
-    if(history.length > 20) history.shift();
+  /* ---------- захоплення звуку: будь-який MediaStream → PCM 16 kHz mono int16 ---------- */
+  let actx = null;
+  function getCtx(){
+    if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if(actx.state === 'suspended') actx.resume();
+    return actx;
   }
-
-  /* ---------- Azure Speech with continuous language detection ---------- */
-  let capStream = null;
-  async function start(){
-    if(!cfg.speechKey || !cfg.region || !cfg.aoaiEndpoint || !cfg.aoaiKey || !cfg.deployment){
-      $('settings').showModal(); return;
-    }
-    if(typeof SpeechSDK === 'undefined'){ showError('Не вдалось завантажити Azure Speech SDK. Перевір інтернет і онови сторінку.'); return; }
-
-    const SHORT = {en:'en-US',ru:'ru-RU',pl:'pl-PL',de:'de-DE',es:'es-ES',fr:'fr-FR',it:'it-IT',pt:'pt-PT',
-                   uk:'uk-UA',tr:'tr-TR',cs:'cs-CZ',ja:'ja-JP',zh:'zh-CN',ko:'ko-KR',nl:'nl-NL',sv:'sv-SE',vi:'vi-VN',ar:'ar-SA'};
-    const norm = c => {
-      const p = c.split('-');
-      if(p.length === 1) return SHORT[p[0].toLowerCase()] || c;
-      return p[0].toLowerCase() + '-' + p[1].toUpperCase();
-    };
-    const langs = [...new Set(cfg.langs.split(/[,;\s]+/).filter(Boolean).map(norm))].slice(0, 10);
-    if(!langs.length){ showError('Вкажи хоча б одну мову в налаштуваннях, напр.: en-US,ru-RU,pl-PL,de-DE'); return; }
-    setStatus('мови: ' + langs.join(' '));
-    capStream = null;
-    if($('source').value === 'system'){
-      try{
-        const ds = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
-        if(!ds.getAudioTracks().length){
-          ds.getTracks().forEach(t => t.stop());
-          showError('Звук не передається. У вікні вибору обери вкладку Chrome і постав галочку «Поділитися звуком вкладки».'); return;
-        }
-        ds.getVideoTracks().forEach(t => t.stop());
-        capStream = new MediaStream(ds.getAudioTracks());
-        capStream.getAudioTracks()[0].onended = () => stop();
-      }catch(e){ showError('Не вдалось захопити звук: ' + e.message); return; }
-    }
-    try{
-      const speechConfig = SpeechSDK.SpeechConfig.fromEndpoint(
-        new URL(`wss://${cfg.region.trim()}.stt.speech.microsoft.com/speech/universal/v2`), cfg.speechKey.trim());
-      speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_LanguageIdMode, 'Continuous');
-      const auto = SpeechSDK.AutoDetectSourceLanguageConfig.fromLanguages(langs);
-      const audio = capStream ? SpeechSDK.AudioConfig.fromStreamInput(capStream) : SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-      recognizer = SpeechSDK.SpeechRecognizer.FromConfig(speechConfig, auto, audio);
-    }catch(e){ showError('Помилка ініціалізації: ' + e.message); return; }
-
-    const langOf = r => { try{ return SpeechSDK.AutoDetectSourceLanguageResult.fromResult(r).language; }catch(e){ return ''; } };
-
-    recognizer.recognizing = (s, e) => { if(e.result.text) onInterim(e.result.text, langOf(e.result)); };
-    recognizer.recognized = (s, e) => {
-      if(e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text.trim())
-        onFinal(e.result.text.trim(), langOf(e.result));
-    };
-    recognizer.canceled = (s, e) => {
-      if(e.reason === SpeechSDK.CancellationReason.Error){
-        let msg = 'Speech: ' + e.errorDetails;
-        if(String(e.errorDetails).includes('1007'))
-          msg += '\nAzure не прийняв один із кодів мов або регіон не підтримує безперервне визначення мови. Відкрий ⚙ і постав мови у форматі en-US,ru-RU,pl-PL,de-DE (по одній на мову, без зайвих символів); якщо не допоможе — спробуй регіон westeurope або eastus.';
-        showError(msg);
-      }
-      stop();
-    };
-
-    recognizer.startContinuousRecognitionAsync(
-      () => { running = true; $('mic').classList.add('on'); setStatus('слухаю…'); },
-      err => { showError('Не вдалось запустити: ' + err); }
-    );
-  }
-
-  function stop(){
-    if(capStream){ capStream.getTracks().forEach(t => t.stop()); capStream = null; }
-    if(recognizer){
-      const r = recognizer; recognizer = null;
-      r.stopContinuousRecognitionAsync(() => r.close(), () => r.close());
-    }
-    running = false; $('mic').classList.remove('on'); setStatus('очікування');
-  }
-
-  /* ---------- Push-to-talk: мій голос → переклад → озвучення ---------- */
-  const MY_LANG = 'uk-UA';   // якою мовою говориш ти
-  const TGT = {
-    'en-US':['English','en-US-JennyNeural'],'vi-VN':['Vietnamese','vi-VN-HoaiMyNeural'],'ar-SA':['Arabic','ar-SA-ZariyahNeural'],
-    'ru-RU':['Russian','ru-RU-SvetlanaNeural'],'pl-PL':['Polish','pl-PL-ZofiaNeural'],'de-DE':['German','de-DE-KatjaNeural'],
-    'es-ES':['Spanish','es-ES-ElviraNeural'],'fr-FR':['French','fr-FR-DeniseNeural'],'it-IT':['Italian','it-IT-ElsaNeural'],
-    'tr-TR':['Turkish','tr-TR-EmelNeural'],'zh-CN':['Chinese','zh-CN-XiaoxiaoNeural'],'ja-JP':['Japanese','ja-JP-NanamiNeural'],
-    'ko-KR':['Korean','ko-KR-SunHiNeural'],'cs-CZ':['Czech','cs-CZ-VlastaNeural']
-  };
-  try{ const t = localStorage.getItem('live_translator_tgt'); if(t && TGT[t]) $('tgt').value = t; }catch(e){}
-  $('tgt').onchange = () => { try{ localStorage.setItem('live_translator_tgt', $('tgt').value); }catch(e){} synth = null; };
-
-  let pttRec = null, pttBusy = false, pttHeld = false, pttStarted = false, pttText = [];
-  let synth = null, synthVoice = '', speakChain = Promise.resolve();
-
-  function getSynth(){
-    const voice = TGT[$('tgt').value][1];
-    if(synth && synthVoice === voice) return synth;
-    if(synth){ try{ synth.close(); }catch(e){} }
-    const sc = SpeechSDK.SpeechConfig.fromSubscription(cfg.speechKey, cfg.region);
-    sc.speechSynthesisVoiceName = voice;
-    sc.speechSynthesisOutputFormat = SpeechSDK.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
-    synth = new SpeechSDK.SpeechSynthesizer(sc, SpeechSDK.AudioConfig.fromDefaultSpeakerOutput());
-    synthVoice = voice;
-    try{ SpeechSDK.Connection.fromSynthesizer(synth).openConnection(); }catch(e){}
-    return synth;
-  }
-  function speak(text){
-    if(!text.trim()) return;
-    speakChain = speakChain.then(() => new Promise(res => {
-      getSynth().speakTextAsync(text, r => {
-        if(r.reason === SpeechSDK.ResultReason.Canceled) showError('Озвучення: ' + r.errorDetails);
-        res();
-      }, e => { showError('Озвучення: ' + e); res(); });
-    }));
-  }
-
-  async function translateAndSpeak(text, row){
-    const [lang] = TGT[$('tgt').value];
-    const url = `${cfg.aoaiEndpoint.replace(/\/+$/,'')}/openai/deployments/${encodeURIComponent(cfg.deployment)}/chat/completions?api-version=2024-06-01`;
-    const res = await fetch(url, {
-      method:'POST', headers:{'Content-Type':'application/json','api-key':cfg.aoaiKey},
-      body: JSON.stringify({
-        messages:[{role:'system',content:`You are a speech interpreter. Translate the user's text into natural, fluent spoken ${lang}. Keep meaning, tone and names. Output ONLY the translation.`},{role:'user',content:text}],
-        temperature:0.1, max_tokens:400, stream:true
-      })
-    });
-    if(!res.ok){
-      let d=''; try{ d=(await res.json()).error?.message||''; }catch(e){}
-      throw new Error(`Azure OpenAI ${res.status}: ${d}`);
-    }
-    const reader = res.body.getReader(), dec = new TextDecoder();
-    let raw = '', full = '', buf = '';
-    for(;;){
-      const {done, value} = await reader.read();
-      if(done) break;
-      raw += dec.decode(value, {stream:true});
-      const lines = raw.split('\n'); raw = lines.pop();
-      for(const l of lines){
-        if(!l.startsWith('data:') || l.includes('[DONE]')) continue;
-        let d = ''; try{ d = JSON.parse(l.slice(5)).choices?.[0]?.delta?.content || ''; }catch(e){}
-        if(!d) continue;
-        full += d; buf += d; row.tr.textContent = full; scrollDown();
-        let m;
-        while((m = buf.match(/^([\s\S]*?[.!?…؟。！？]+)\s+([\s\S]*)$/))){ speak(m[1]); buf = m[2]; }
-      }
-    }
-    speak(buf);
-  }
-
-  /* Мікрофон завжди готовий + пре-ролл 0.5с, щоб перші слова не губились */
-  let mic = null, preroll = [], talking = false, pushStream = null;
-  async function initMic(){
-    if(mic) return mic;
-    const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, echoCancellation:true, noiseSuppression:true}});
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  function tap(stream, onChunk){
+    const ctx = getCtx();
+    const src = ctx.createMediaStreamSource(stream);
     const proc = ctx.createScriptProcessor(2048, 1, 1), ratio = ctx.sampleRate / 16000;
+    const mute = ctx.createGain(); mute.gain.value = 0;
     proc.onaudioprocess = e => {
       const inp = e.inputBuffer.getChannelData(0), n = Math.floor(inp.length / ratio), out = new Int16Array(n);
       for(let i = 0; i < n; i++){
@@ -447,56 +231,216 @@ Rules:
         const v = Math.max(-1, Math.min(1, sum / (b - a)));
         out[i] = v < 0 ? v * 0x8000 : v * 0x7FFF;
       }
-      if(talking && pushStream) pushStream.write(out.buffer);
-      else { preroll.push(out.buffer); if(preroll.length > 12) preroll.shift(); }
+      onChunk(out.buffer);
     };
-    ctx.createMediaStreamSource(stream).connect(proc); proc.connect(ctx.destination);
-    mic = {ctx, stream};
-    return mic;
+    src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
+    return () => { try{ src.disconnect(); proc.disconnect(); mute.disconnect(); }catch(e){} };
+  }
+  const PCM = {audio_format:'pcm_s16le', sample_rate:16000, num_channels:1};
+
+  /* ==================== Слухання: будь-яка мова → українська ==================== */
+  let running = false, ws = null, untap = null, capStream = null, keepTimer = null;
+  let cur = null, lastRow = null;
+  const trQueue = [];            // закриті рядки, чий переклад ще доходить
+
+  function render(r){
+    const o = (r.oF + (r.oNF ? '<span class="nf">' + esc(r.oNF) + '</span>' : ''));
+    r.txt.innerHTML = r.oF ? esc(r.oF).trimStart() + (r.oNF ? '<span class="nf">' + esc(r.oNF) + '</span>' : '') : (r.oNF ? '<span class="nf">' + esc(r.oNF.trimStart()) + '</span>' : '');
+    const isUk = short(r.srcLang) === LISTEN_TARGET;
+    if(isUk && !r.tF && !r.tNF){ r.tr.innerHTML = r.txt.innerHTML; }
+    else r.tr.innerHTML = esc(r.tF.trimStart()) + (r.tNF ? '<span class="nf">' + esc(r.tF ? r.tNF : r.tNF.trimStart()) + '</span>' : '') || '<span class="nf">…</span>';
+    if(r.srcLang) r.lang.textContent = short(r.srcLang);
+    r.el.classList.toggle('live', !r.closed || !!r.tNF);
+    void o;
+  }
+  function closeCur(){
+    if(!cur) return;
+    cur.closed = true;
+    const isUk = short(cur.srcLang) === LISTEN_TARGET;
+    if(!isUk && (!cur.tF || cur.tNF)) trQueue.push(cur);
+    render(cur);
+    lastRow = cur; cur = null;
+  }
+
+  function onMain(m){
+    if(m.error_code){ showError(sonioxError(m)); stop(); return; }
+    if(!m.tokens) return;
+    const active = [cur, ...trQueue].filter(Boolean);
+    active.forEach(r => { r.oNF = ''; r.tNF = ''; });
+    const touched = new Set(active);
+    for(const t of m.tokens){
+      if(t.text === '<end>'){ if(t.is_final) closeCur(); continue; }
+      if(t.text === '<fin>') continue;
+      if(t.translation_status === 'translation'){
+        let r = trQueue[0] || cur || lastRow;
+        if(!r){ cur = makeRow(true); r = cur; }
+        if(t.is_final) r.tF += t.text; else r.tNF += t.text;
+        touched.add(r);
+      } else {
+        if(!cur){ cur = makeRow(true); }
+        if(t.language){ cur.srcLang = t.language; $('detected').textContent = 'розпізнано: ' + langName(t.language); }
+        if(t.is_final){
+          cur.oF += t.text;
+          // довга безперервна мова (відео): ріжемо рядок на кінці речення
+          if(cur.oF.length > 180 && /[.!?…。？！]\s*$/.test(cur.oF)) { touched.add(cur); closeCur(); continue; }
+        } else cur.oNF += t.text;
+        touched.add(cur);
+      }
+    }
+    // рядки з черги, чий переклад уже повністю фінальний, виходять із черги
+    while(trQueue.length && trQueue[0].tF && !trQueue[0].tNF){ touched.add(trQueue.shift()); }
+    touched.forEach(r => r && render(r));
+    scrollDown();
+  }
+
+  async function connectMain(){
+    const hints = [...new Set(cfg.langs.split(/[,;\s]+/).filter(Boolean).map(short))];
+    const conf = {
+      model: MODEL, ...PCM,
+      language_hints: hints.length ? hints : undefined,
+      enable_language_identification: true,
+      enable_endpoint_detection: true,
+      max_endpoint_delay_ms: 1500,
+      translation: {type:'one_way', target_language: LISTEN_TARGET},
+      context: baseContext()
+    };
+    ws = await openSoniox(conf, onMain, e => {
+      ws = null;
+      if(running){ setStatus('перепідключення…'); setTimeout(() => running && connectMain().catch(err => { showError(err.message); stop(); }), 600); }
+    });
+    setStatus('слухаю…');
+  }
+
+  async function start(){
+    if(!cfg.sonioxKey){ $('settings').showModal(); return; }
+    capStream = null;
+    try{
+      if($('source').value === 'system'){
+        const ds = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
+        if(!ds.getAudioTracks().length){
+          ds.getTracks().forEach(t => t.stop());
+          showError('Звук не передається. У вікні вибору обери вкладку Chrome і постав галочку «Поділитися звуком вкладки».'); return;
+        }
+        ds.getVideoTracks().forEach(t => t.stop());
+        capStream = new MediaStream(ds.getAudioTracks());
+        capStream.getAudioTracks()[0].onended = () => stop();
+      } else {
+        capStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, echoCancellation:true, noiseSuppression:true}});
+      }
+    }catch(e){ showError('Не вдалось захопити звук: ' + e.message); return; }
+
+    running = true; $('mic').classList.add('on'); setStatus('підключення…');
+    try{ await connectMain(); }
+    catch(e){ showError(e.message); stop(); return; }
+    untap = tap(capStream, buf => { if(ws && ws.readyState === 1) ws.send(buf); });
+    keepTimer = setInterval(() => { if(ws && ws.readyState === 1) ws.send(JSON.stringify({type:'keepalive'})); }, 20000);
+  }
+
+  function stop(){
+    running = false;
+    clearInterval(keepTimer);
+    if(untap){ untap(); untap = null; }
+    if(capStream){ capStream.getTracks().forEach(t => t.stop()); capStream = null; }
+    if(ws){ try{ if(ws.readyState === 1) ws.send(''); }catch(e){} const w = ws; ws = null; setTimeout(() => { try{ w.close(); }catch(e){} }, 3000); }
+    $('mic').classList.remove('on'); setStatus('очікування');
+  }
+
+  /* ==================== Push-to-talk: мій голос → переклад → озвучення ==================== */
+  try{ const t = localStorage.getItem('live_translator_tgt'); if(t && $('tgt').querySelector(`option[value="${t}"]`)) $('tgt').value = t; }catch(e){}
+  $('tgt').onchange = () => { try{ localStorage.setItem('live_translator_tgt', $('tgt').value); }catch(e){} };
+
+  // мікрофон для PTT тримаємо відкритим + пре-ролл ~0.5 с, щоб перші слова не губились
+  let pttMic = null, preroll = [], talking = false, pttWs = null, pttQueue = [], pttBusy = false, pttHeld = false;
+  async function initPttMic(){
+    if(pttMic) return;
+    pttMic = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, echoCancellation:true, noiseSuppression:true}});
+    tap(pttMic, buf => {
+      if(talking){
+        if(pttWs && pttWs.readyState === 1) pttWs.send(buf); else pttQueue.push(buf);
+      } else { preroll.push(buf); if(preroll.length > 4) preroll.shift(); }
+    });
+  }
+
+  let voices = [];
+  const loadVoices = () => { voices = speechSynthesis.getVoices(); };
+  if('speechSynthesis' in window){ loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+  function speak(text){
+    text = text.trim();
+    if(!text || !('speechSynthesis' in window)) return;
+    const code = $('tgt').value, s = short(code);
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = code;
+    const v = voices.find(v => v.lang === code) || voices.find(v => short(v.lang) === s);
+    if(v) u.voice = v;
+    else showError('У браузері немає голосу для «' + langName(code) + '». Переклад показано текстом. На Mac голоси додаються в Системні параметри → Спеціальні можливості → Озвучений вміст.');
+    speechSynthesis.speak(u);
   }
 
   async function pttStart(){
     if(pttBusy) return;
-    if(!cfg.speechKey || !cfg.region || !cfg.aoaiEndpoint || !cfg.aoaiKey || !cfg.deployment){ $('settings').showModal(); return; }
-    pttBusy = true; pttHeld = true; pttStarted = false; pttText = [];
+    if(!cfg.sonioxKey){ $('settings').showModal(); return; }
+    pttBusy = true; pttHeld = true;
     $('ptt').classList.add('on'); setStatus('говори…');
+    try{ speechSynthesis.cancel(); }catch(e){}
+    try{ await initPttMic(); getCtx(); }
+    catch(e){ showError('Мікрофон: ' + e.message); return pttReset(); }
+
+    pttQueue = preroll.slice(); preroll = [];
+    talking = true;
+    const row = makeRow(true);
+    row.lang.textContent = '→ ' + short($('tgt').value).toUpperCase();
+    let spoken = 0;
+    const speakReady = final => {
+      const rest = row.tF.slice(spoken);
+      if(final){ speak(rest); spoken = row.tF.length; return; }
+      const m = rest.match(/^[\s\S]*[.!?…؟。！？](\s|$)/);
+      if(m){ speak(m[0]); spoken += m[0].length; }
+    };
+    const tgt = short($('tgt').value);
+    const conf = {
+      model: MODEL, ...PCM,
+      language_hints: [MY_LANG],
+      enable_endpoint_detection: false,
+      translation: {type:'one_way', target_language: tgt === 'zh' ? 'zh' : tgt},
+      context: baseContext()
+    };
+    let done = false;
+    const finish = () => { if(done) return; done = true; speakReady(true); row.closed = true; row.el.classList.remove('live');
+                           if(!row.oF.trim()) { row.el.remove(); setStatus('не почув, спробуй ще'); } else setStatus('очікування');
+                           pttWs = null; pttBusy = false; };
     try{
-      getSynth();
-      await initMic();
-      if(mic.ctx.state === 'suspended') await mic.ctx.resume();
-      if(!pttHeld){ pttReset(); return; }          // відпустив, поки чекали дозвіл
-      pushStream = SpeechSDK.AudioInputStream.createPushStream(SpeechSDK.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1));
-      preroll.forEach(b => pushStream.write(b)); preroll = [];
-      talking = true;
-      const sc = SpeechSDK.SpeechConfig.fromSubscription(cfg.speechKey, cfg.region);
-      sc.speechRecognitionLanguage = MY_LANG;
-      pttRec = new SpeechSDK.SpeechRecognizer(sc, SpeechSDK.AudioConfig.fromStreamInput(pushStream));
-      pttRec.recognized = (s, e) => { if(e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) pttText.push(e.result.text); };
-      pttRec.canceled = (s, e) => { if(e.reason === SpeechSDK.CancellationReason.Error){
-        let m = 'Speech: ' + e.errorDetails;
-        if(String(e.errorDetails).includes('1007')) m += '\nЛіміт Azure Speech: вимкни 🎙 (основний запис), якщо він увімкнений, і перевір тариф ресурсу (Free F0 дозволяє лише 1 одночасний запит і 5 год/міс).';
-        showError(m); } };
-      pttRec.startContinuousRecognitionAsync(() => {}, err => { showError('Speech: ' + err); pttReset(); });
-      pttStarted = true;
-    }catch(e){ showError('Мікрофон: ' + e.message); pttReset(); }
+      pttWs = await openSoniox(conf, m => {
+        if(m.error_code){ showError(sonioxError(m)); return; }
+        if(m.tokens){
+          row.oNF = ''; row.tNF = '';
+          for(const t of m.tokens){
+            if(t.text === '<end>' || t.text === '<fin>') continue;
+            if(t.translation_status === 'translation'){ if(t.is_final) row.tF += t.text; else row.tNF += t.text; }
+            else { if(t.is_final) row.oF += t.text; else row.oNF += t.text; }
+          }
+          row.txt.innerHTML = esc(row.oF.trimStart()) + (row.oNF ? '<span class="nf">' + esc(row.oNF) + '</span>' : '');
+          row.tr.innerHTML = esc(row.tF.trimStart()) + (row.tNF ? '<span class="nf">' + esc(row.tNF) + '</span>' : '') || '<span class="nf">…</span>';
+          scrollDown();
+          speakReady(false);
+        }
+        if(m.finished) finish();
+      }, () => finish());
+      pttQueue.forEach(b => pttWs.send(b)); pttQueue = [];
+      if(!pttHeld) endPttStream();          // відпустив, поки підключались
+    }catch(e){ showError(e.message); row.el.remove(); pttReset(); }
   }
-  function pttReset(){ talking = false; pttBusy = false; pttHeld = false; pttStarted = false; $('ptt').classList.remove('on'); setStatus('очікування'); }
-  function pttEnd(){ pttHeld = false; if(pttStarted) pttFinish(); }
-  async function pttFinish(){
-    pttStarted = false; $('ptt').classList.remove('on'); setStatus('переклад…');
-    await new Promise(r => setTimeout(r, 250));     // дописуємо кінець фрази
-    talking = false; try{ pushStream.close(); }catch(e){}
-    const r = pttRec; pttRec = null;
-    r.stopContinuousRecognitionAsync(async () => {
-      r.close();
-      const text = pttText.join(' ').trim();
-      if(!text){ pttReset(); setStatus('не почув, спробуй ще'); return; }
-      const row = makeRow(false);
-      row.lang.textContent = '→ ' + $('tgt').value.split('-')[0].toUpperCase();
-      row.txt.textContent = text; row.tr.textContent = '…'; scrollDown();
-      try{ await translateAndSpeak(text, row); }catch(e){ row.tr.textContent = ''; showError(e.message); }
-      pttReset();
-    }, e => { r.close(); showError('Speech: ' + e); pttReset(); });
+  function endPttStream(){
+    setStatus('переклад…');
+    setTimeout(() => {                       // дописуємо кінець фрази
+      talking = false;
+      if(pttWs && pttWs.readyState === 1){ pttQueue.forEach(b => pttWs.send(b)); pttQueue = []; pttWs.send(''); }
+    }, 300);
+  }
+  function pttReset(){ talking = false; pttBusy = false; pttHeld = false; $('ptt').classList.remove('on'); setStatus('очікування'); }
+  function pttEnd(){
+    if(!pttHeld) return;
+    pttHeld = false; $('ptt').classList.remove('on');
+    if(pttWs && pttWs.readyState === 1) endPttStream();
   }
   const pb = $('ptt');
   pb.addEventListener('pointerdown', e => { e.preventDefault(); try{ pb.setPointerCapture(e.pointerId); }catch(_){} pttStart(); });
@@ -505,16 +449,13 @@ Rules:
 
   $('source').addEventListener('change', () => { $('mic').textContent = $('source').value === 'system' ? '🔊' : '🎙'; });
 
-  /* ---------- UI wiring ---------- */
+  /* ---------- UI ---------- */
   $('mic').onclick = () => running ? stop() : start();
   $('clear').onclick = () => {
     feed.querySelectorAll('.row,.err').forEach(n => n.remove());
-    liveRow = null; history.length = 0; emptyEl.style.display = '';
+    cur = null; lastRow = null; trQueue.length = 0; errors.clear(); emptyEl.style.display = '';
   };
-  $('openSettings').onclick = () => {
-    FIELDS.forEach(f => $(f).value = cfg[f] || '');
-    $('settings').showModal();
-  };
+  $('openSettings').onclick = () => { FIELDS.forEach(f => $(f).value = cfg[f] || ''); $('settings').showModal(); };
   $('closeSettings').onclick = () => $('settings').close();
   $('saveSettings').onclick = () => {
     FIELDS.forEach(f => cfg[f] = $(f).value.trim());
